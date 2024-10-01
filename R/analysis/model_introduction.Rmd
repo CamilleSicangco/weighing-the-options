@@ -1,0 +1,164 @@
+---
+title: "Test 1, Thermal Cost"
+author: "Camille K. Sicangco"
+date: "2023-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(here)
+source(here('scripts/packages.R'))
+```
+
+# Preliminary test of stomatal model accounting for thermal cost
+
+We first set up our environmental variables. We set air temperature equal to 48$^\circ$C, soil water potential to -0.2 MPa, and relative humidity to 50%. The remaining environmental variables are taken as the default values of PPFD = 1000 umol m^-2^ s^-1^ and atmospheric pressure = 101.325 kPa.
+
+```{r environment}
+# Environment
+T_air = 49
+Ps = 1
+RH = 70
+PPFD = 800
+```
+
+## Hydraulics
+
+We now follow a stomatal optimization setup based on the Sperry et al. 2016 model, except that we will account for thermal costs associated with leaf damage from high temperatures.
+
+First, we compute the hydraulics for the plant. We set parameter values for the vulnerability curve and the value of plant hydraulic conductance at 25$^\circ$C. We then plot the vulnerability curve and integrate it to obtain the transpiration supply stream as described by Sperry et al.
+
+```{r hydraulics}
+# Set hydraulic parameters
+Weibull = fit_Weibull(P50 = 4.9, P88 = 6.41)
+b = Weibull[1,1]
+c = Weibull[1,2]
+kmax_25 = 1.5
+pts = 300 # sets resolution (higher number equals higher resolution)
+
+# Calculate critical leaf water potential
+Pcrit = calc_Pcrit(b, c)
+
+# Create vector of water potentials ranging from soil to critical water potential
+P = Ps_to_Pcrit(Ps, Pcrit, pts)
+
+# Calculate vulnerability curve and associated transpiration supply stream
+VC = vulnerability_curve(P, b, c)
+E = trans_from_vc(P, kmax_25, T_air, b, c)
+
+# Plot VC and E vs LWP
+plot(P, VC, type = 'l', 
+     ylab = "Proportion of conductivity", xlab = "Leaf water potential (-MPa)")
+plot(P, E, type = 'l', xlab = "Leaf water potential (-MPa)",
+     ylab = expression("E (mmol m"^-2*"s"^-1*")"))
+```
+
+## Leaf physiology
+
+From the transpiration supply function, we calculate the leaf physiological variables over the transpiration stream. We first calculate leaf temperature as
+
+$$T_{leaf} = T_{air} + \frac {R_{net} - \lambda E}{C_p (g_{Ha} + g_r)},$$ where $R_{net}(T_{air}, PPFD, RH)$ is the net radiation (W m^-2^), $\lambda (T_{air})$ is the latent heat of vaporization (J mol^-1^), $C_p$ is the specific heat of air at constant pressure (J mol^-1^ $^\circ$C^-1^), $g_{Ha}$ is the boundary layer conductance to forced convection (mol m^-2^ s^-1^), and $g_r$ is the radiative conductance (mol m^-2^ s^-1^).
+
+From $T_{leaf}$, we calculate $D_{leaf} = e_{s}(T_{leaf}) - e_a(T_{air}) \frac {RH} {100}$, $g_w = \frac {P_{atm} E} {D_{leaf}}$, and finally the photosynthetic rate $A$ from the **Photosyn** function in the package **plantecophys**.
+
+```{r physio, fig.show="hold", out.width="50%"}
+T_leaf = calc_Tleaf(T_air = T_air, E = E, RH = RH)
+D_leaf = calc_Dleaf(T_leaf = T_leaf, T_air = T_air, RH = RH)
+g_w = calc_gw(E = E, D_leaf = D_leaf)
+A = calc_A(T_air = T_air, E = E, RH = RH)
+
+plot(P, T_leaf, type = "l", col = "black", xlab = "Leaf water potential (-MPa)",
+     ylab = expression("T"[leaf]*" (\u00B0C)"))
+plot(P, D_leaf, type = "l", col = "blue", xlab = "Leaf water potential (-MPa)",
+     ylab = expression("D"[leaf]*" (kPa)"))
+plot(P, g_w, type = "l", col = "orange", xlab = "Leaf water potential (-MPa)",
+     ylab = expression("g"[w]*" (mol m"^-2*"s"^-1*")"))
+plot(P, A, type = "l", col = "purple", xlab = "Leaf water potential (-MPa)",
+     ylab = expression("A (" * mu * "mol m"^-2*"s"^-1*")"))
+```
+
+## Thermal damage
+
+As mentioned, we also consider the cost of thermal damage to the leaf. To do so, we model a curve of minimum fluorescence vs temperature (F~0~-T) with a logistic function $$F_{0} = \frac{(F_{0,max} - F_{0,min})} {1 + e^{-r \times (T_{leaf} - T_{50})}} + F_{0,min}.$$
+
+The parameters required are T~50~ (i.e. the temperature halfway between the critical temperature T~crit~ and the temperature at which the maximum F~0~ is first recorded), the minimum and maximum values of F~0~, and a scaling parameter r.
+
+```{r thermal damage}
+T_leaf_for_F0vT = seq(30, 54, length.out = 400)
+Tcrit = 49.5
+T50 = 51
+F0_min = 500
+F0_max = 1000
+
+F0_for_F0vT = F0_func(T_leaf_for_F0vT, Tcrit, T50, F0_max, F0_min)
+plot(T_leaf_for_F0vT, F0_for_F0vT, type = 'l',
+     ylab = expression("F"[0]), xlab = "Temperature (\u00B0C)")
+```
+
+## Cost and gain functions
+
+We then compute the hydraulic and thermal costs, as well as the carbon gain over the full range of leaf water potentials. The costs and gains are calculated as
+
+$$HC = \frac{k_{max} - k(\psi_{leaf})}{k_{max} - k_{crit}},$$ $$TC = \frac{F_{0}(\psi_{leaf}) - F_{0,min}}{F_{0,max} - F_{0,min}},$$ $$CG = \frac{A(\psi_{leaf})}{A_{max}}.$$
+
+```{r cost-gain}
+hydraulic_cst = hydraulic_cost(P = P, b = b, c = c, T_air = T_air, kmax_25 = kmax_25)
+thermal_cst = thermal_cost(P = P, b = b, c = c, kmax_25 = kmax_25, T_air = T_air, RH = RH, Tcrit = Tcrit, T50 = T50)
+carbon_gain = C_gain(P = P, b = b, c = c, kmax_25 = kmax_25, T_air = T_air, RH = RH)
+
+{plot(P, hydraulic_cst, type = 'l', col = 'blue', 
+      ylab = "HC, TC, CG", xlab = "Leaf water potential (-MPa)", xlim = c(0, Pcrit))
+lines(P, thermal_cst, type = 'l', col = 'orange')
+lines(P, carbon_gain, type = 'l', col = 'green')
+legend("right", legend = c("Hydraulic cost", "Thermal cost", "Carbon gain"),
+       col = c("blue", "orange", "green"), pch = 19, pt.cex = 2)
+}
+
+plot(P, hydraulic_cst, type = 'l', col = 'blue', 
+     ylab = "HC, TC, CG", xlab = "Leaf water potential (-MPa)", xlim = c(0, Pcrit), lwd = 2)
+lines(P, thermal_cst, type = 'l', col = 'orange', lty = 2, lwd = 2)
+lines(P, carbon_gain, type = 'l', col = 'black', lty = 3, lwd = 2)
+
+```
+
+We can also evaluate different functions we might optimize, namely $CG - HC$ and $CG - (HC + TC)$.
+
+```{r opt}
+CG_minus_HC = carbon_gain - hydraulic_cst
+comb_costs = hydraulic_cst + thermal_cst
+CG_minus_bothC = carbon_gain - comb_costs
+
+{plot(P, CG_minus_HC, type = "l", col = "blue", 
+      ylab = "Gain - Costs", xlab = "Leaf water potential (-MPa)",
+      lwd = 2, xlim = c(0, Pcrit))
+lines(P, CG_minus_bothC, type = "l", col = "orange", lty = 2, 
+      lwd = 2)
+legend("topright", legend = c("Hydraulic cost", "Hydraulic + thermal costs"),
+       col = c("blue", "orange"), pch = 19, pt.cex = 2)
+}
+
+plot(P, comb_costs, type = "l", col = "black", 
+     ylab = "Hydraulic + thermal costs", xlab = "Leaf water potential (-MPa)")
+```
+
+## Variable plant conductance with viscosity
+
+Another distinguishing feature of this model is that it accounts for the temperature dependence of plant hydraulic conductance, k~plant~, on temperature. This is achieved by making k~plant~ proportional to the inverse of viscosity (i.e. fluidity; shown empirically by e.g. Cochard et al. 2000, Tyree and Zimmerman 2002), which itself increases with temperature. We model the temperature dependence of viscosity with the equation $\eta = \frac {1.95 x 10^{14}}{T^7_w}$ (Roderick and Berry, 2001), such that $$k_{max} = k_{max,25} \frac {T_{air,K}^7} {298.15^7}.$$
+
+Below we plot an example of the temperature dependence of viscosity, fluidity, and k~plant~, where k~max,25~ is 4 mmol m^-2^ s^-1^ MPa ^-1^.
+
+```{r viscosity}
+temp_range = seq(0,50)
+temp_rangeK = temp_range+273
+
+viscosity = 1.95e14/temp_rangeK**7
+fluidity = 1/viscosity
+kmax_pl = calc_kmax(kmax_25 = 4, T_air = temp_range)
+
+plot(temp_range, viscosity, type = 'l', xlab = "Temperature (\u00B0C)",
+     ylab = "Viscosity (Pa s)")
+plot(temp_range, fluidity, type = 'l', xlab = "Temperature (\u00B0C)",
+     ylab = expression("Fluidity (Pa" ^-1 * " s" ^-1 * ")"))
+plot(temp_range, kmax_pl, type = 'l', xlab = "Temperature (\u00B0C)",
+     ylab = expression("k"[max] * " (mmol m"^-2*" s"^-1*" MPa"^-1 *")"))
+```

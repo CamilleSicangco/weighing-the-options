@@ -54,7 +54,6 @@ make_pred_fn = function(Tair,
   # Compute costs and gains
   cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Wind = Wind, 
                             Wleaf = Wleaf, LeafAbs = LeafAbs,
-                            #Amax_net = Amax_net, Amax_gross = Amax_gross,
                             Tair = Tair, PPFD = PPFD, 
                             VPD = VPD, Tcrit = Tcrit, T50 = T50, 
                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
@@ -75,7 +74,8 @@ make_pred_fn = function(Tair,
   
   P = marg_df$P[i]
   E = E_vec[i]
-  Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs)
+  Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
+                     Wleaf = Wleaf, LeafAbs = LeafAbs)
   Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
   gs = calc_gw(E = E, D_leaf = Dleaf)
   net = if (model == "Sperry") {
@@ -83,7 +83,8 @@ make_pred_fn = function(Tair,
   } else if (model == "Sicangco") {
     TRUE
   } 
-  A = calc_A(Tair = Tair, E = E, VPD = VPD, net = net, PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+  A = calc_A(Tair = Tair, E = E, VPD = VPD, net = net, PPFD = PPFD, Wind = Wind, 
+             Wleaf = Wleaf, LeafAbs = LeafAbs,
              Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
              Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ)
   

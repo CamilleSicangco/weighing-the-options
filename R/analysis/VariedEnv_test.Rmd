@@ -1,0 +1,295 @@
+---
+title: "Model testing with net carbon gain and varied environmental conditions"
+author: "Camille K. Sicangco"
+date: "2023-08-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos = "H", fig.width = 10, fig.asp = .35)
+
+library(here)
+source(here('scripts/packages.R'))
+```
+
+```{r functions, echo=FALSE}
+# Plot costs and gains
+plot_costgain = function(df)
+{
+  palette = c(HC = "#1E88E5", TC = "#FFC107", CG_net = "#D81B60", CG_gross = "#D81B60")
+  linetype = c(HC = "solid", TC = "solid", CG_net = "solid", CG_gross = "dashed")
+  p = ggplot(df, aes(x = P, y = cost_gain)) + 
+    geom_line(aes(color = ID, linetype = ID), linewidth = 1) + 
+    theme_classic() + 
+    scale_color_manual(values = palette, name = "Cost/gain") +
+    xlab("Leaf water potential (-MPa)") +
+    ylab("HC, TC, CG") +
+    expand_limits(x = 0) +
+    scale_linetype_manual(values = linetype, "Cost/gain") +
+    theme(text = element_text(size = 20)) +
+    geom_hline(yintercept = 0, linetype = "dashed")
+  return(p)
+}
+
+# Plot combined costs
+plot_CC = function(df)
+{
+  palette = c(HC = "#1E88E5", TC = "#FFC107", CC = "#D81B60")
+  p = ggplot(df, aes(x = P, y = cost)) + 
+    geom_line(aes(color = ID)) + 
+    theme_classic() + 
+    scale_color_manual(values = palette, name = "Cost") +
+    xlab("Leaf water potential (-MPa)") +
+    ylab("HC, CC") +
+    expand_limits(x = 0)
+  return(p)
+}
+
+# Plot carbon gain minus costs
+plot_GminC = function(df)
+{
+  palette = c(HC = "#1E88E5", CC = "#FFC107")
+  linetype = c(net = "solid", gross = "dashed")
+  p = ggplot(df, aes(x = P, y = CG_min_C)) + 
+    geom_line(aes(color = cost, linetype = A)) + 
+    theme_classic() + 
+    scale_color_manual(values = palette, name = "Cost") +
+    scale_linetype_manual(values = linetype, name = "A") +
+    xlab("Leaf water potential (-MPa)") +
+    ylab("Gain - Costs") +
+    expand_limits(x = 0)
+  return(p)
+}
+
+# Combine plots
+comb_plts = function(plt1, plt2, plt3)
+{
+  plt0 = ggarrange(plt1 + theme(axis.title.x = element_blank()), 
+                   plt2 + theme(axis.text.y = element_blank(),
+                               axis.ticks.y = element_blank(),
+                               axis.title.y = element_blank(),
+                               axis.title.x = element_blank()),
+                   plt3 + theme(axis.text.y = element_blank(),
+                               axis.ticks.y = element_blank(),
+                               axis.title.y = element_blank(),
+                               axis.title.x = element_blank()),
+                   common.legend = TRUE, nrow = 1)
+  plt = annotate_figure(plt0, bottom = text_grob("Leaf water potential (-MPa)"))
+  return(plt)
+}
+
+# Calculate all marginal gains and costs
+marginal_gaincost = function(df)
+{
+  df = df %>% pivot_wider(names_from = ID, values_from = cost_gain) %>% 
+    mutate(CC = HC + TC)
+  HC = marginal_GainCost(df$P, df$HC)
+  CC = marginal_GainCost(df$P, df$CC)
+  CG_gross = marginal_GainCost(df$P, df$CG_gross)
+  CG_net = marginal_GainCost(df$P, df$CG_net)
+  
+  df_out = data.frame(P = df$P[-1], CG_gross, CG_net, HC, CC)
+  return(df_out)
+}
+
+# Calculate marginal cost or gain 
+marginal_GainCost = function(x = P, y)
+{
+  dy_dx = diff(y) / diff(x)
+  return(dy_dx)
+}
+
+# Plot marginal gain and cost 
+plot_marginal = function(df, inclRC = FALSE)
+{
+  palette = c("HC" = "#1E88E5", "HC + TC" = "#FFC107",
+              CG_gross = "#D81B60", CG_net = "#D81B60")
+  linetype = c("HC" = "dashed", "HC + TC" = "solid",
+               CG_gross = "dashed", CG_net = "solid")
+  
+  df = pivot_longer(
+    df,
+    cols = CG_gross:CC,
+    names_to = "ID",
+    values_to = "marginal_cost_gain"
+  )
+  
+  df$ID = gsub("CC", "HC + TC", df$ID)
+  
+  plt = df %>% 
+    ggplot(aes(x = P, y = marginal_cost_gain, color = ID, linetype = ID)) +
+    geom_line(size = 1) +
+    theme_classic() +
+    scale_color_manual(values = palette) + 
+    scale_linetype_manual(values = linetype) +
+    ylab("Marginal costs/gains") +
+    xlab(expression("\u03A8"[leaf]*" (-MPa)")) +
+    expand_limits(x = 0) +
+    theme(text = element_text(size = 20))
+  
+  return(plt)
+}
+```
+
+## Variable Tair, Constant SWP
+
+Here we evaluate the impact of increasing air temperature for a given soil water potential. We set SWP = -3 MPa and evaluate what happens when the air temperature rises from 44$^\circ$C to 47$^\circ$C, then to 50 $^\circ$C.
+```{r environment1, echo=FALSE}
+# Environment
+Tair_l = 45
+Tair_m = 50
+Tair_h = 55
+Ps = 2
+VPD = 1.5
+PPFD = 700
+
+# Thermal damage
+Tcrit = 48.574
+  T50 = 50.17
+
+# Hydraulics
+Weibull = fit_Weibull(P50 = 4.31, P88 = 6.64)
+b = Weibull[1,1]
+c = Weibull[1,2]
+kmax_25 = 1.5
+Pcrit = calc_Pcrit(b, c)
+P = Ps_to_Pcrit(Ps, Pcrit)
+
+# Calculate memory Amax values
+#Tair_range = seq(30,50, by = 0.5)
+#Amax_net = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, constant_kmax = TRUE, net = TRUE, netOrig = FALSE)[1,2]
+#Amax_gross = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, constant_kmax = TRUE)[1,2]
+```
+
+We first plot the cost and gain functions. The carbon gain is plotted in terms of both gross and net photosynthesis.
+```{r costgain1, echo=FALSE}
+cost_gain_h = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                            Tair = Tair_h, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+cost_gain_m = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                            Tair = Tair_m, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+cost_gain_l = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                            Tair = Tair_l, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+
+cost_gain = bind_rows(cost_gain_h, cost_gain_l, .id = "Tair")
+cost_gain$Tair[cost_gain$Tair == 1] = Tair_h
+cost_gain$Tair[cost_gain$Tair == 2] = Tair_l
+
+p_h = plot_costgain(cost_gain_h)
+p_m = plot_costgain(cost_gain_m)
+p_l = plot_costgain(cost_gain_l)
+
+comb_plts(p_l, p_m, p_h)
+```
+
+
+Now we plot the difference between the carbon gain minus either the hydraulic cost alone (i.e. as in the Sperry model) or the summed hydraulic and thermal costs. This step is done for both the gross and net carbon gain.
+```{r opt1, echo=FALSE}
+GminC_l = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                         kmax_25 = kmax_25, Tair = Tair_l, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+GminC_m = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                         kmax_25 = kmax_25, Tair = Tair_m, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+GminC_h = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                         kmax_25 = kmax_25, Tair = Tair_h, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+
+p_l = plot_GminC(GminC_l)
+p_m = plot_GminC(GminC_m)
+p_h = plot_GminC(GminC_h)
+
+comb_plts(p_l, p_m, p_h)
+```
+
+Last, we plot the marginal costs and gains to clearly identify the optimal solutions for LWP, taking into account either the hydraulic cost alone or summed with the thermal cost, and either the gross or net carbon gain.
+``` {r marginal1, echo=FALSE}
+margGC_h = marginal_gaincost(cost_gain_h)
+margGC_m = marginal_gaincost(cost_gain_m)
+margGC_l = marginal_gaincost(cost_gain_l)
+
+p_h = plot_marginal(margGC_h) + ylim(0,1)
+p_m = plot_marginal(margGC_m) + ylim(0,1)
+p_l = plot_marginal(margGC_l) + ylim(0,1)
+
+comb_plts(p_l, p_m, p_h)
+```
+
+## Variable SWP, Constant Tair
+
+Now we evaluate the impact of lowering the soil water potential at a constant air temperature. We set the air temperature to 46$^\circ$C and evaluate what happens as the SWP drops from 0 MPa to -2.5 MPa, then to -5 MPa.
+```{r environment2, echo=FALSE}
+# Environment
+Tair = 46
+Ps_l = 0
+Ps_m = 3.5
+Ps_h = 5
+
+# Hydraulics
+Weibull = fit_Weibull(P50 = 4.9, P88 = 6.41)
+b = Weibull[1,1]
+c = Weibull[1,2]
+Pcrit = calc_Pcrit(b, c)
+
+P_l = Ps_to_Pcrit(Ps_l, Pcrit)
+P_m = Ps_to_Pcrit(Ps_m, Pcrit)
+P_h = Ps_to_Pcrit(Ps_h, Pcrit)
+
+# Calculate memory Amax values
+Tair_range = seq(30,50, by = 0.5)
+Amax_net = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, constant_kmax = TRUE, net = TRUE, netOrig = FALSE)[1,2]
+Amax_gross = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, constant_kmax = TRUE)[1,2]
+```
+
+We first plot the cost and gain functions.
+```{r costgain2, echo=FALSE}
+cost_gain_h = calc_costgain(P_h, b, c, kmax_25 = kmax_25, Amax_net = Amax_net, Amax_gross = Amax_gross, Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+cost_gain_m = calc_costgain(P_m, b, c, kmax_25 = kmax_25, Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                            Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+cost_gain_l = calc_costgain(P_l, b, c, kmax_25 = kmax_25, Amax_net = Amax_net, Amax_gross = Amax_gross, 
+                            Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+
+cost_gain = bind_rows(cost_gain_h, cost_gain_l, .id = "Tair")
+cost_gain$Tair[cost_gain$Tair == 1] = Tair_h
+cost_gain$Tair[cost_gain$Tair == 2] = Tair_l
+
+p_h = plot_costgain(cost_gain_h)
+p_m = plot_costgain(cost_gain_m)
+p_l = plot_costgain(cost_gain_l)
+
+comb_plts(p_l, p_m, p_h)
+```
+
+Now we plot the difference between the carbon gain minus either the hydraulic cost alone (i.e. as in the Sperry model) or the summed hydraulic and thermal costs.
+```{r opt2, echo=FALSE}
+GminC_l = gain_min_costs(P_l, b, c, Amax_net = Amax_net, Amax_gross = Amax_gross, kmax_25 = kmax_25, Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+GminC_m = gain_min_costs(P_m, b, c, Amax_net = Amax_net, Amax_gross = Amax_gross, kmax_25 = kmax_25, Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+GminC_h = gain_min_costs(P_h, b, c, Amax_net = Amax_net, Amax_gross = Amax_gross, kmax_25 = kmax_25, Tair = Tair, PPFD = PPFD, VPD = VPD,
+                          Tcrit = Tcrit, T50 = T50)
+
+p_l = plot_GminC(GminC_l)
+p_m = plot_GminC(GminC_m)
+p_h = plot_GminC(GminC_h)
+
+comb_plts(p_l, p_m, p_h)
+```
+
+Now we plot the marginal costs and gains.
+``` {r marginal2, echo=FALSE}
+margGC_h = marginal_gaincost(cost_gain_h)
+margGC_m = marginal_gaincost(cost_gain_m)
+margGC_l = marginal_gaincost(cost_gain_l)
+
+p_h = plot_marginal(margGC_h)
+p_m = plot_marginal(margGC_m)
+p_l = plot_marginal(margGC_l)
+
+comb_plts(p_l, p_m, p_h)
+```
