@@ -3,6 +3,17 @@
 
 # Function to make predictions with Sperry and Sicangco models
 make_pred.1 = function(Tair, model) {
+  Wind = 8
+  Wleaf = 0.01
+  LeafAbs = 0.86
+  Vcmax=34
+  EaV=51780
+  EdVC=2e5
+  delsC=640
+  Jmax = 60
+  EaJ=21640
+  EdVJ=2e5
+  delsJ=633
   Ps = 2
   VPD = 1.5
   PPFD = 700
@@ -23,7 +34,7 @@ make_pred.1 = function(Tair, model) {
   kmax_25 = 1.5
   Pcrit = calc_Pcrit(b, c)
   P = Ps_to_Pcrit(Ps, Pcrit)
-  E_vec = trans_from_vc(P, kmax_25, Tair, b, c)
+  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
   
   
   # Calculate Amax values
@@ -34,7 +45,13 @@ make_pred.1 = function(Tair, model) {
   # Compute costs and gains
   cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                             Tair = Tair, PPFD = PPFD, 
-                              VPD = VPD, Tcrit = Tcrit, T50 = T50)
+                            VPD = VPD, Tcrit = Tcrit, T50 = T50,
+                            #Wind = Wind, Wleaf = Wleaf, 
+                            #LeafAbs = LeafAbs,
+                            #Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                            #Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+                            constant_kmax = TRUE
+  )
   #ggplot(cost_gain, aes(x = P, y = cost_gain, color = ID)) +geom_line() +theme_classic()
   # Compute marginal costs and gains
   marg_df = marginal_gaincost(cost_gain)
@@ -50,13 +67,23 @@ make_pred.1 = function(Tair, model) {
   
   P = marg_df$P[i]
   E = E_vec[i]
-  Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD)
+  Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD#, 
+                     #Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs
+                     )
   Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
   gs = calc_gw(E = E, D_leaf = Dleaf)
   A = if (model == "Sperry") {
-    calc_A(Tair = Tair, E = E, VPD = VPD, net = FALSE)
+    calc_A(Tair = Tair, E = E, VPD = VPD, net = FALSE,
+           #Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+           #Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+           #Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ
+           )
   } else if (model == "Sicangco") {
-    calc_A(Tair = Tair, E = E, VPD = VPD, net = TRUE)
+    calc_A(Tair = Tair, E = E, VPD = VPD, net = TRUE#, 
+           #Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+           #Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+           #Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ
+           )
   } else {
     stop()
   }
@@ -67,20 +94,27 @@ make_pred.1 = function(Tair, model) {
 
 # Environment
 Tair_vec = seq(30,55, by = 1)
-models = c("Sperry", "Sicangco")
-sims_vec = data.frame(Tair = rep(Tair_vec, each = 2), 
-                      model = rep(models, times = length(Tair_vec)))
+PPFD = 700
+VPD = 1.5
+kmax = 1.5
+Ps = 2
+Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, kmax = kmax,
+                         Ps = Ps)
+out = make_pred(Tair_sim.df)
 
 # Make predictions (Sperry and Sicangco)
 #make_pred(Tair = 50, "Sperry") # test for one Tair
-out = mapply(make_pred, sims_vec$Tair, sims_vec$model) # multiple Tair's
-out = data.frame(t(out))
-names(out) = c("Model", "Tair", "P", "E", "Tleaf", "Dleaf", "gs", "A")
-out = out %>% mutate(across(Tair:A, as.numeric))
+models = c("Sperry", "Sicangco")
+sims_vec = data.frame(Tair = rep(Tair_vec, each = 2), 
+                      model = rep(models, times = length(Tair_vec)))
+out.1 = mapply(make_pred.1, sims_vec$Tair, sims_vec$model) # multiple Tair's
+out.1 = data.frame(t(out.1))
+names(out.1) = c("Model", "Tair", "P", "E", "Tleaf", "Dleaf", "gs", "A")
+out.1 = out.1 %>% mutate(across(Tair:A, as.numeric))
 
 # Make Medlyn predictions
 Medlyn_preds = plantecophys::PhotosynEB(Tair=Tair_vec,
-                          VPD=1.5,
+                          VPD=VPD,
                           Wind=8,Wleaf=0.01,StomatalRatio=1, LeafAbs=0.86,
                           PPFD=PPFD,g1 = 2.9,g0=0.003,
                           Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
@@ -91,7 +125,7 @@ Medlyn_preds_sim = Medlyn_preds %>%
   select(Model, Tair, E, Tleaf, Dleaf, gs, A)
 
 # Combine all predictions
-out_all = bind_rows(out, Medlyn_preds_sim)
+out_all = bind_rows(out.1, Medlyn_preds_sim)
 
 # Plot predictions #############################################################
 
@@ -159,5 +193,5 @@ out_l %>%
   geom_point() + geom_line() +
   facet_wrap(vars(var), scales = "free") + 
   theme_classic() +
-  scale_color_manual(values = c("Sicangco" = "#FFC107", "Sperry" = "#1E88E5", Medlyn = "#D81B60"))
-C_gain()
+  scale_color_manual(values = c("Sicangco" = "#FFC107", "Sperry" = "#1E88E5", Medlyn = "#D81B60")) #+
+  #ggtitle(" - Default photosyn and leaf params + constant kmax")

@@ -4,6 +4,8 @@
 
 # Load packages and functions
 source("R/load_packages.R")
+source("R/functions/data_processing_functions.R")
+source("R/functions/analysis_functions.R")
 
 # Force models with increasing air temperature
 source("R/analysis/T_range_testing.R")

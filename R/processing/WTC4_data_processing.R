@@ -16,15 +16,17 @@ SWC_df$DateTime_hr <- HIEv::nearestTimeStep(SWC_df$DateTime_hr,nminutes=30,"floo
 # Load flux data
 fluxes_df = read.csv(
   "http://hie-pub.westernsydney.edu.au/07fcd9ac-e132-11e7-b842-525400daae48/WTC_TEMP-PARRA_HEATWAVE-FLUX-PACKAGE_L1/data/WTC_TEMP-PARRA_CM_WTCFLUX-CANOPYTEMP_20161029-20161115_L0.csv"
-)
+) %>% 
+  rename(Tair = Tair_al, PPFD = PAR, Tcan = TargTempC_Avg, A = Photo, E = Trans) %>% 
+  select(-PPFD_Avg)
 
 fluxes_df$DateTime_hr <- as.POSIXct(fluxes_df$DateTime_hr,format="%Y-%m-%d %T",tz="GMT")
-fluxes_df$Tdiff <- with(fluxes_df,TargTempC_Avg-Tair_al)
+fluxes_df$Tdiff <- with(fluxes_df,Tcan-Tair)
 
 # Calculate conductance as the simple ratio between Trans and VPD. But use leaf to air VPD. Leaf to air VPD tends to be greater than air VPD, as leaves tend to be warmer than air. Plot the relationships between photosynthesis, conductance, and leaftoairVPD. Note the shift in points at extreme temperatures and VPD in teh heatwave treatment, consistent with lower photosynthesis than would be expected given the measured gs.
-fluxes_df$Dleaf <- VPDairToLeaf(VPD=fluxes_df$VPD,Tair=fluxes_df$Tair_al,Tleaf=fluxes_df$TargTempC_Avg)
-fluxes_df$gs <- fluxes_df$Trans/fluxes_df$Dleaf/10
-fluxes_df$Atogs <- with(fluxes_df,Photo/(gs*1000))
+fluxes_df$Dleaf <- VPDairToLeaf(VPD=fluxes_df$VPD,Tair=fluxes_df$Tair,Tleaf=fluxes_df$Tcan)
+fluxes_df$gs <- fluxes_df$E/fluxes_df$Dleaf/10
+fluxes_df$Atogs <- with(fluxes_df,A/(gs*1000))
 
 # Aggregate to hourly averages
 fluxes_df$DateTime_hr <- HIEv::nearestTimeStep(fluxes_df$DateTime_hr,nminutes=30,"floor")
@@ -38,7 +40,7 @@ fluxes_df$sw0 = match_data(fluxes_df, SWC_df, "sw0")
 # Subset to just the heatwave time periods
 starttime <- as.POSIXct("2016-10-20 00:00:00",format="%Y-%m-%d %T",tz="GMT")
 endtime <- as.POSIXct("2016-11-11 20:00:00",format="%Y-%m-%d %T",tz="GMT")
-WTC4_data <- subset(fluxes_df,DateTime_hr>starttime & DateTime_hr<endtime)
+WTC4_data <- subset(fluxes_df,DateTime_hr>starttime & DateTime_hr<endtime) 
 
 
 # Estimate soil water potential ################################################
@@ -50,6 +52,10 @@ WP_df = read.csv(
 predawn_df = WP_df %>% filter(Timing == "pre-dawn")
 predawn_df$Date = as.Date(predawn_df$Date)
 predawn_df$day = as.numeric(as.Date(predawn_df$Date) - as.Date(starttime))
+
+  
+# Filter out pre-drought measure - don't do, causes most fits to have positive slope
+#predawn_df = predawn_df %>% filter(Date != "2016-10-19")
 
 # Fit linear regression through predawn data to estimate soil water potential
 predawn_fits = plyr::ddply(predawn_df, "chamber", function(x) {
@@ -80,23 +86,36 @@ WTC4_data$Ps = sapply(1:nrow(WTC4_data), function(i) {
   return(Ps)
 })
 
+WTC4_data  %>%  ggplot(aes(x = DateTime_hr, y = -Ps, color = chamber)) + geom_point() + theme_classic()
 # Chambers 7, 9, 11 have increasing trend in predawn LWP, but decreasing SWC
-WTC4_data %>% ggplot(aes(x = DateTime_hr, y = Ps, color = chamber)) + geom_line() + theme_classic()
+WTC4_data %>% ggplot(aes(x = DateTime_hr, y = sw, color = chamber)) + geom_line() + theme_classic()
 WTC4_data %>% 
-  filter(chamber %in% c("C07", "C09", "C11")) %>% 
+  filter(chamber %in% c("C02", "C07", "C09", "C11")) %>% 
   ggplot(aes(x = DateTime_hr, y = sw0, color = chamber)) + geom_line() + theme_classic()
 predawn_df %>% 
-  filter(chamber %in% c("C07", "C09", "C11")) %>% 
+  filter(chamber %in% c("C02", "C07", "C09", "C11")) %>% 
   ggplot(aes(x = Date, y = LWP, color = chamber)) + geom_point() + theme_classic()
 
 # Write csv of final data frame for analysis
 write.csv(WTC4_data, "data/in/WTC4_data.csv", row.names = FALSE)
 
 # Alternative estimation of Ps from soil water retention curve
-#theta_sat = 0.185 # m3 m-3
-#bch = 4
-#Psie = - 0.003 # MPa
-#WTC4_data$Ps = Psie * (WTC4_data$sw0 / theta_sat)**(-bch)
+theta_sat = 0.185 # m3 m-3
+bch = 4
+Psie = - 0.003 # MPa
+WTC4_data$Ps_alt = Psie * (WTC4_data$sw / theta_sat)**(-bch)
+
+filter(predawn_df, Date !="2016-10-19" & chamber%in% c("C02", "C07", "C09", "C11")) %>% 
+  ggplot(aes(x = as.POSIXct(Date), y = LWP, color = chamber)) +
+  geom_point() +
+  geom_line() +
+  theme_classic()
+
+ggplot() +
+  geom_line(data = WTC4_data, aes(x = DateTime_hr, y = -Ps, color = chamber)) +
+  geom_point(data = filter(predawn_df, Date !="2016-10-19"), aes(x = as.POSIXct(Date), y = LWP, color = chamber)) +
+  theme_classic()
+
 
 # Fit kmax for Sperry and Sicangco models
 ## Fit kmax ####################################################################
@@ -118,13 +137,47 @@ LeafArea_df = fluxes_df[1:12,] %>% select(chamber, LeafArea)
 E_kmax = fluxes_v3 %>% 
   filter(linktime >= "2016-10-19 11:00:00" & linktime <= "2016-10-19 14:00:00") %>% 
   left_join(LeafArea_df, by = "chamber") %>% 
-  select(chamber, FluxH2O, LeafArea) %>%
+  select(chamber, FluxH2O, LeafArea, Tair) %>%
   mutate(E = FluxH2O / LeafArea * 10^3) %>%
   group_by(chamber) %>%
-  summarize(E = max(E))
+  slice_max(E)
 
 kmax_df = WP_kmax %>%
-  mutate(E = E_kmax$E) %>%
+  mutate(E = E_kmax$E, Tair = E_kmax$Tair) %>%
   mutate(kmax = E / (P_PD - P_MD)) %>%
   select(chamber, kmax)
 write.csv(kmax_df, "data/in/kmax_values.csv", row.names = FALSE)
+
+LWP_df = WP_df %>% 
+  filter(tissue == "leaf") %>% 
+  pivot_wider(names_from = Timing, values_from = LWP) %>% 
+  rename(Ps = "pre-dawn", Pleaf = "midday") %>% 
+  group_by(chamber, Date) %>% 
+  summarise(Ps = mean(Ps), Pleaf = mean(Pleaf))
+LWP_df$Date = as.Date(LWP_df$Date)
+
+fluxes_v3 = fluxes_v3 %>% 
+  left_join(LeafArea_df, by = "chamber")
+
+# Extended flux data
+WTC4_LWP.ext = merge(LWP_df, mutate(fluxes_v3, Date = as.Date(linktime)), 
+                 by = c("chamber", "Date")
+)
+WTC4_LWP.ext$Time = as_hms(ymd_hms(WTC4_LWP.ext$linktime))
+WTC4_LWP.ext = WTC4_LWP.ext %>% 
+  filter(Time >= as_hms("11:00:00") & Time <= as_hms("14:00:00") & DoorCnt == 0) %>% 
+  left_join(kmax_df, by = "chamber") %>% 
+  rename(DateTime_hr = linktime, Tair = Tair_al) %>% 
+  mutate(HWtrt = ifelse(chamber %in% c("C01", "C02", "C05", "C06", "C08", "C11"),
+                        "C",
+                        "HW"),
+         E = FluxH2O / LeafArea* 10^3)
+
+# Original
+WTC4_LWP = merge(LWP_df, mutate(fluxes_df, Date = as.Date(DateTime_hr)), 
+                 by = c("chamber", "Date")
+)
+WTC4_LWP$Time = as_hms(WTC4_LWP$DateTime_hr)
+WTC4_LWP = WTC4_LWP %>% 
+  filter(Time >= as_hms("11:00:00") & Time <= as_hms("14:00:00")) %>% 
+  left_join(kmax_df, by = "chamber")
