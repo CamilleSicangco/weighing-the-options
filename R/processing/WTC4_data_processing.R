@@ -96,6 +96,12 @@ predawn_df %>%
   filter(chamber %in% c("C02", "C07", "C09", "C11")) %>% 
   ggplot(aes(x = Date, y = LWP, color = chamber)) + geom_point() + theme_classic()
 
+# Hold constant at lowest measured value
+WTC4_data$Ps[WTC4_data$chamber == "C02"] = max(WTC4_data$Ps[WTC4_data$chamber == "C02"])
+WTC4_data$Ps[WTC4_data$chamber == "C07"] = max(WTC4_data$Ps[WTC4_data$chamber == "C07"])
+WTC4_data$Ps[WTC4_data$chamber == "C09"] = max(WTC4_data$Ps[WTC4_data$chamber == "C09"])
+WTC4_data$Ps[WTC4_data$chamber == "C11"] = max(WTC4_data$Ps[WTC4_data$chamber == "C11"])
+
 # Write csv of final data frame for analysis
 write.csv(WTC4_data, "data/in/WTC4_data.csv", row.names = FALSE)
 
