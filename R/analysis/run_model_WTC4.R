@@ -5,7 +5,7 @@
 # Load functions
 source("R/functions/analysis_functions.R")
 
-# Load data frame
+# Load data framehttp://127.0.0.1:29759/graphics/plot_zoom_png?width=515&height=769
 #WTC4_data = read.csv("data/in/WTC4_data.csv")
 #WTC4_data$DateTime_hr <- as.POSIXct(WTC4_data$DateTime_hr,format="%Y-%m-%d %T",tz="GMT")
 
@@ -62,11 +62,10 @@ Rd0 = 0.92
 TrefR = 25
 Rd = Rd0 * exp(0.1012 * (control$Tcan - TrefR) - 5e-04 * (control$Tcan^2 - TrefR^2))
 pred1.c <- PhotosynEB(Tair=control$Tair,VPD=control$VPD,Wind=8,Wleaf=0.01,StomatalRatio=1,
-                    LeafAbs=0.86,
+                    LeafAbs=0.5,
                     PPFD=control$PPFD,g1=g1,g0=g0,
                     Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-                    Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
-                    Rd = Rd)
+                    Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)
 table(pred1.c$failed) # Some energy balance calculations failed
 pred1.c$Tdiff <- with(pred1.c,Tleaf-Tair)
 
@@ -79,7 +78,8 @@ control = control %>% mutate(kmax = 0.7)
 #test_s = control[1:20,] # Subset of dataset for testing
 
 # Generate predictions
-pred2.c = make_pred(df = control, models = "final") # Really slow! Try to optimize
+pred2.c = make_pred(df = control, models = "final", LeafAbs = 0.5, 
+                    Tcrit_hw = 42.1, T50_hw = 48.4) # Really slow! Try to optimize
 #pred2.c = make_pred(df = control, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
 
 # Check if either model predicts negative gs values
@@ -97,7 +97,7 @@ table(pred3.c$gs[pred3.c$Model == "Sperry + TC"] >= 0) # All predict positive gs
 summary(control$PPFD[which(pred3.c$gs < 0)]) # Happens for low PPFD (< 52.5)
 
 # Save control observations and predictions
-save(control, pred1.c, pred2.c, pred3.c, file = "data/out/control_runs_kmaxpt8.Rdata")
+save(control, pred1.c, pred2.c, file = "data/out/control_runs_kmaxpt7_fittedTcritT50.Rdata")
 load("data/out/control_runs_kmax1.Rdata")
 
 ## Plot results ################################################################
@@ -238,15 +238,11 @@ gam_A.hw = gam(A ~ s(Tcan), data = heatwave)
 ## Fit the Medlyn model ########################################################
 
 # Fit the heatwave treatment (i.e., not the heatwave trees)
-Rd0 = 0.92
-TrefR = 25
-Rd = Rd0 * exp(0.1012 * (heatwave$Tcan - TrefR) - 5e-04 * (heatwave$Tcan^2 - TrefR^2))
 pred1.hw <- PhotosynEB(Tair=heatwave$Tair,VPD=heatwave$VPD,Wind=8,Wleaf=0.01,StomatalRatio=1,
-                    LeafAbs=0.86,
+                    LeafAbs=0.5,
                     PPFD=heatwave$PPFD,g1=g1,g0=g0,
                     Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-                    Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
-                    Rd = Rd)
+                    Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Ca = 420)
 
 table(pred1.hw$failed) # Some energy balance calculations failed
 pred1.hw$Tdiff <- with(pred1.hw,Tleaf-Tair)
@@ -260,7 +256,8 @@ heatwave = heatwave %>% mutate(kmax = 0.7)
 #test_s = control[1:20,] # Subset of dataset for testing
 
 # Generate predictions
-pred2.hw = make_pred(df = heatwave, models = "final", Tcrit_hw = 46, T50_hw = 48) # Really slow! Try to optimize
+pred2.hw = make_pred(df = heatwave, models = "final", 
+                     Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5) # Really slow! Try to optimize
 #pred2.hw = make_pred(df = heatwave, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
 
 plot(pred2.hw$P[pred2.hw$Model == "Sperry"])
@@ -281,7 +278,7 @@ summary(control$PPFD[which(pred3.hw$gs < 0)]) # Happens for low PPFD (< 52.5)
 
 
 # Save heatwave observations and predictions
-save(heatwave, pred1.hw, pred2.hw, pred3.hw, file = "data/out/heatwave_runs_kmaxpt8.Rdata")
+save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_kmaxpt7_fittedTcritT50.Rdata")
 load("data/out/heatwave_runs_kmaxpt8.Rdata")
 
 ## Plot results ################################################################ 
@@ -311,7 +308,9 @@ out.hw = data.frame(datetime = rep(heatwave$DateTime_hr, times = 4),
                     gs = c(heatwave$gs, pred1.hw$gw, pred2.hw$gs),
                     Dleaf = c(heatwave$Dleaf, pred1.hw$VPDleaf, pred2.hw$Dleaf),
                     Tleaf = c(heatwave$Tcan, pred1.hw$Tleaf, pred2.hw$Tleaf),
-                    Tair = c(heatwave$Tair, pred1.hw$Tair, pred2.hw$Tair)) 
+                    Tair = c(heatwave$Tair, pred1.hw$Tair, pred2.hw$Tair),
+                    VPD = rep(heatwave$VPD, times = 4),
+                    PPFD = rep(heatwave$PPFD, times = 4)) 
 out.hw$model = factor(out.hw$model, levels = c("Sicangco", "Sperry", "Medlyn", "observed"))
 
 pred3.hw.reformat = pred3.hw %>% 
@@ -373,7 +372,7 @@ AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) + ggtitle("Control") + theme(axis.ti
 AEvT.plt = annotate_figure(AEvT.plt,
                 bottom = text_grob(expression("T"[canopy]*" (\u00B0C)")))
 AEvT.plt
-ggsave(plot = AEvT.plt, filename = "figs/AEvT_plt_kmaxpt8_Tcrit46_T5048.pdf", width = 8, height = 7)
+ggsave(plot = AEvT.plt, filename = "figs/AEvT_plt_kmaxpt7_fittedTcritT50.pdf", width = 8, height = 7)
 
 
 pred2.hw %>% 
@@ -414,3 +413,40 @@ out.hw %>%
          linetype = "none") +
   theme(plot.title = element_blank()) + 
   geom_hline(yintercept = 0)
+
+bind_rows(out.c, out.hw) %>% 
+  #filter(model == "Medlyn") %>% 
+  pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
+  #pivot_longer(cols = Medlyn:Sperry, names_to = "model", values_to = "Tleaf_pred") %>% 
+  rename(Tleaf = observed, Tleaf_pred = Medlyn) %>% 
+  ggplot() +
+  geom_point(aes(x = Tleaf, y = Tleaf_pred - Tleaf), alpha = .5) +
+  theme_classic() +
+  scale_color_manual(
+    values = c("Medlyn" = "#D81B60", 
+               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
+  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
+  ylab(expression("predicted - observed T"[leaf]*" (\u00B0C)")) + 
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
+         linetype = "none") +
+  theme(plot.title = element_blank()) + 
+  geom_hline(yintercept = 0)
+
+
+heatwave %>% 
+  ggplot(aes(x = Tair, y = Tleaf)) +
+  geom_point() +
+  theme_classic()+ 
+  geom_abline(slope = 1)
+
+out.hw %>% 
+  ggplot(aes(x = model, y = Tleaf, fill = model)) +
+  geom_boxplot() +
+  geom_violin() +
+  scale_color_manual(
+    values = c("observed" = "darkgrey", "Medlyn" = "#D81B60", 
+               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
+  theme_classic() +
+  geom_hline(yintercept = 46, linetype = "dashed") #+
+  annotate("text", y=Tcrit, label="Tcrit", vjust = -0.5)
+  
