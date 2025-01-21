@@ -2,10 +2,10 @@
 
 # Issues with Anet and CG calculation ##########################################
 ## Point test ##################################################################
-
+Photosyn()
 # Set parameters
-P50 = 4.31
-P88 = 6.64
+P50 = 4.07
+P88 = 5.50
 Weibull = fit_Weibull(P50, P88)
 b = Weibull[1,1]
 c = Weibull[1,2]
@@ -27,7 +27,8 @@ Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD,
                    LeafAbs = 0.5)
 D_leaf = plantecophys::VPDairToLeaf(VPD = VPD, Tair = Tair, 
                                     Tleaf = Tleaf)
-g_w = calc_gw(E, D_leaf)
+g_w = calc_gw(E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, PPFD = PPFD,
+              Wind = 8, Wleaf = 0.01)
 Rd = Rd0 * exp(0.1178 * (Tleaf - TrefR) - 7.017e-4 * (Tleaf^2 - TrefR^2))
 
 # Calculate photosynthesis
@@ -181,7 +182,7 @@ abline(h = Rd)
 ## of Ci as gs approaches 0 is Ca!
 
 ## Photosynthetic predictions over a range, including Ci #######################
-Photosyn_v = Vectorize(Photosyn_custom2)
+Photosyn_v = Vectorize(Photosyn_custom)
 Photo_out = Photosyn_v(Tleaf = Tleaf, GS = g_w, VPD = VPD, PPFD = PPFD, 
            Vcmax=34,EaV=51780,EdVC=2e5,delsC=640, # add other VJ params
            Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)

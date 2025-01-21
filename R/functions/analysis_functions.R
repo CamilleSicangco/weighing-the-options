@@ -10,7 +10,9 @@ prescribedE_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.86, Rd0 = 0.92
   Tleaf[grep("Error", Tleaf)] = NA
   Tleaf = as.numeric(Tleaf)
   Dleaf = try(VPDairToLeaf(Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD))
-  gs = try(calc_gw(E = df$Trans, D_leaf = Dleaf))
+  #gs = try(calc_gw(E = df$Trans, D_leaf = Dleaf))
+  gs = try(calc_gw(E = df$E, Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD, 
+                   PPFD = df$PPFD, Wind = Wind, Wleaf = Wleaf))
   Agr =  mapply(plantecophys::Photosyn, VPD = df$VPD, 
               Ca = 420, PPFD = df$PPFD, Tleaf = df$Tcan,  
               GS = gs,
@@ -138,7 +140,10 @@ make_pred_fn = function(Tair,
   Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
                      Wleaf = Wleaf, LeafAbs = LeafAbs)
   Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
-  gs = calc_gw(E = E, D_leaf = Dleaf)
+  #gs = calc_gw(E = E, D_leaf = Dleaf)
+  gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
+          PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
+  
   #net = if (model == "Sperry") {
   #  FALSE
   #} else if (model == "Sicangco") {

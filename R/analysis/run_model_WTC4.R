@@ -79,7 +79,7 @@ control = control %>% mutate(kmax = 0.7)
 
 # Generate predictions
 pred2.c = make_pred(df = control, models = "final", LeafAbs = 0.5, 
-                    Tcrit_hw = 42.1, T50_hw = 48.4) # Really slow! Try to optimize
+                    Tcrit_hw = 42.1, T50_hw = 48.4, P50 = 4.07, P88 = 5.50) # Really slow! Try to optimize
 #pred2.c = make_pred(df = control, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
 
 # Check if either model predicts negative gs values
@@ -257,7 +257,7 @@ heatwave = heatwave %>% mutate(kmax = 0.7)
 
 # Generate predictions
 pred2.hw = make_pred(df = heatwave, models = "final", 
-                     Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5) # Really slow! Try to optimize
+                     Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50) # Really slow! Try to optimize
 #pred2.hw = make_pred(df = heatwave, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
 
 plot(pred2.hw$P[pred2.hw$Model == "Sperry"])
@@ -270,7 +270,8 @@ table(pred2$gs[pred2$Model == "Sperry"] >= 0) # No negative gs
 ### Fit intermediate models, i.e. Sperry with either CGnet or TC ###############
 
 # Generate predictions
-pred3.hw = make_pred(df = heatwave, models = "intermediate") # Really slow! Try to optimize
+pred3.hw = make_pred(df = heatwave, models = "intermediate", 
+                     Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50) # Really slow! Try to optimize
 # Check if either model predicts negative gs values
 table(pred3.hw$gs[pred3.hw$Model == "Sperry + CGnet"] >= 0) # 158/2341 have negative gs
 table(pred3.hw$gs[pred3.hw$Model == "Sperry + TC"] >= 0) # All predict positive gs
@@ -278,7 +279,7 @@ summary(control$PPFD[which(pred3.hw$gs < 0)]) # Happens for low PPFD (< 52.5)
 
 
 # Save heatwave observations and predictions
-save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_kmaxpt7_fittedTcritT50.Rdata")
+save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_kmaxpt7_fittedTcritT50_corrgs_JPhydraulics.Rdata")
 load("data/out/heatwave_runs_kmaxpt8.Rdata")
 
 ## Plot results ################################################################ 
