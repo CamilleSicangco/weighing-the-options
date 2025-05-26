@@ -78,7 +78,7 @@ make_pred_fn2 = function(
                  T50 = ifelse(df$HWtrt == "HW", T50_hw, T50_c),
                  ...)
   preds = data.frame(t(preds))
-  names(preds) = c("Model", "Tair", "P", "E", "Tleaf", "Dleaf", "gs", "A")
+  names(preds) = c("Model", "Tair", "Ps", "P", "E", "Tleaf", "Dleaf", "gs", "A")
   preds = preds %>% mutate(across(Tair:A, as.numeric))
   return(preds)
 }
@@ -93,12 +93,13 @@ make_pred_fn = function(Tair,
                         Wleaf = 0.025,
                         Tcrit = 48.574,
                         T50 = 50.17,
-                        P50 = 4.31,
-                        P88 = 6.64,
+                        P50 = 4.07,
+                        P88 = 5.50,
                         kmax_25 = 2,
                         Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
                         Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
-                        model) {
+                        model,
+                        ...) {
   
 
   # Hydraulics
@@ -107,35 +108,58 @@ make_pred_fn = function(Tair,
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
   P = Ps_to_Pcrit(Ps, Pcrit)
-  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
+  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
   
+  # Calculate Amax values
+  #Tair_range = seq(30,50, by = 0.5)
+  #Amax_net = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, 
+  #                      constant_kmax = TRUE, net = TRUE, netOrig = FALSE)[1,2]
+  #Amax_gross = Amax_overT(P, b, c, kmax_25, Tair_range = Tair_range, 
+  #                        constant_kmax = TRUE)[1,2]
 
   # Compute costs and gains
-  cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Wind = Wind, 
+  cost_gain = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25, Wind = Wind, 
                             Wleaf = Wleaf, LeafAbs = LeafAbs,
                             Tair = Tair, PPFD = PPFD, 
                             VPD = VPD, Tcrit = Tcrit, T50 = T50, 
                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
                             Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-                            constant_kmax = TRUE)
-  
-  # Compute marginal costs and gains
-  marg_df = marginal_gaincost(cost_gain)
-  
+                            Rd0 = Rd0,
+                            constant_kmax = FALSE#, 
+   #                         Amax_net = Amax_net, Amax_gross = Amax_gross
+                            )
+  cost_gain = cost_gain %>% 
+    pivot_wider(names_from = ID, values_from = cost_gain)
   # Solve optimization
   i = if (model == "Sperry") {
-    which.min(abs(marg_df$CG_gross - marg_df$HC))
+    which.max(cost_gain$CG_gross - cost_gain$HC)
   } else if (model == "Sicangco") {
-    which.min(abs(marg_df$CG_net - marg_df$CC))
+    which.max(cost_gain$CG_net_uncorr - (cost_gain$HC + cost_gain$TC))
   } else if (model == "Sperry + CGnet") {
-    which.min(abs(marg_df$CG_net - marg_df$HC))
+    which.max(cost_gain$CG_net - cost_gain$HC)
   } else if (model == "Sperry + TC") {
-    which.min(abs(marg_df$CG_gross - marg_df$CC))
+    which.max(cost_gain$CG_gross - (cost_gain$HC + cost_gain$TC))
   } else {
     stop()
   }
   
-  P = marg_df$P[i]
+  # Compute marginal costs and gains
+  #marg_df = marginal_gaincost(cost_gain)
+  
+  # Solve optimization
+  #i = if (model == "Sperry") {
+  #  which.min(abs(marg_df$CG_gross - marg_df$HC))
+  #} else if (model == "Sicangco") {
+  #  which.min(abs(marg_df$CG_net - marg_df$CC))
+  #} else if (model == "Sperry + CGnet") {
+  #  which.min(abs(marg_df$CG_net - marg_df$HC))
+  #} else if (model == "Sperry + TC") {
+  #  which.min(abs(marg_df$CG_gross - marg_df$CC))
+  #} else {
+  #  stop()
+  #}
+  
+  P = P[i]
   E = E_vec[i]
   Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
                      Wleaf = Wleaf, LeafAbs = LeafAbs)
@@ -149,15 +173,35 @@ make_pred_fn = function(Tair,
   #} else if (model == "Sicangco") {
   #  TRUE
   #} 
-  A = calc_A(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, PPFD = PPFD, Wind = Wind, 
+  A = calc_A(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
+             PPFD = PPFD, Wind = Wind, 
              Wleaf = Wleaf, LeafAbs = LeafAbs,
              Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
              Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ)
   
-  out = c(model, Tair, P, E, Tleaf, Dleaf, gs, A)
-  names(out) = c("model", "Tair", "P", "E", "Tleaf", "Dleaf", "gs", "A")
+  out = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A)
+  names(out) = c("model", "Tair", "Ps", "Pleaf", "E", "Tleaf", "Dleaf", "gs", "A")
   return(out)
 }
+
+# Calculate Pleaf for the Medlyn model
+calc_Pleaf0 = function(E, Ps, P50 = 4.07, P88 = 5.50) {
+  # Hydraulics
+  Weibull = fit_Weibull(P50, P88)
+  b = Weibull[1,1]
+  c = Weibull[1,2]
+  Pcrit = calc_Pcrit(b, c)
+  P = Ps_to_Pcrit(Ps, Pcrit)
+  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
+  
+  # Get corresponding Pleaf
+  i = which.min(abs(E - E_vec))
+  Pleaf = P[i]
+  
+  return(Pleaf)
+}
+calc_Pleaf = Vectorize(calc_Pleaf0, vectorize.args = c("E", "Ps"))
+
 
 
 # Calculate all marginal gains and costs
@@ -740,26 +784,26 @@ Photosyn_custom2 <- function(VPD=1.5,
       }
       
       # Solution when Rubisco activity is limiting
-      A <- 1.
-      B <- Rd - Vcmax - (CIC + Km) * GC / (Patm * 1.e3)
-      C <- (Vcmax * (CIC - GammaStar) - (CIC + Km) * Rd) * GC / (Patm * 1.e3)
-      Ac <- QUADM(A,B,C)
-      
-      # Photosynthesis when electron transport is limiting
-      B <- Rd - VJ - (CIC + 2. * GammaStar) * GC / (Patm * 1.e3)
-      C <- (VJ * (CIC - GammaStar) - (CIC + 2. * GammaStar) * Rd) * GC / (Patm * 1.e3)
-      Aj <- QUADM(A,B,C)
-      
-      # Solution when Rubisco activity is limiting
-      #A <- 1./GC
-      #B <- (Rd - Vcmax)/GC - Ca - Km
-      #C <- Vcmax * (Ca - GammaStar) - Rd * (Ca + Km)
+      #A <- 1.
+      #B <- Rd - Vcmax - (CIC + Km) * GC / (Patm * 1.e3)
+      #C <- (Vcmax * (CIC - GammaStar) - (CIC + Km) * Rd) * GC / (Patm * 1.e3)
       #Ac <- QUADM(A,B,C)
       
       # Photosynthesis when electron transport is limiting
-      #B <- (Rd - VJ)/GC - Ca - 2*GammaStar
-      #C <- VJ * (Ca - GammaStar) - Rd * (Ca + 2*GammaStar)
+      #B <- Rd - VJ - (CIC + 2. * GammaStar) * GC / (Patm * 1.e3)
+      #C <- (VJ * (CIC - GammaStar) - (CIC + 2. * GammaStar) * Rd) * GC / (Patm * 1.e3)
       #Aj <- QUADM(A,B,C)
+      
+      # Solution when Rubisco activity is limiting
+      A <- 1./GC
+      B <- (Rd - Vcmax)/GC - Ca - Km
+      C <- Vcmax * (Ca - GammaStar) - Rd * (Ca + Km)
+      Ac <- QUADM(A,B,C)
+      
+      # Photosynthesis when electron transport is limiting
+      B <- (Rd - VJ)/GC - Ca - 2*GammaStar
+      C <- VJ * (Ca - GammaStar) - Rd * (Ca + 2*GammaStar)
+      Aj <- QUADM(A,B,C)
       
       # NOTE: the solution above gives net photosynthesis, add Rd
       # to get gross rates (to be consistent with other solutions).
@@ -788,41 +832,41 @@ Photosyn_custom2 <- function(VPD=1.5,
         
         # Modification using Medlyn model
         # Solution when Rubisco activity is limiting
-        A <- (Rd - Vcmax)*(GSDIVA - g0) - g0
-        B <- (Ca - Km)*(g0 - Rd * (GSDIVA - g0)) + 
-          Vcmax * (GSDIVA - g0) * (Ca + GammaStar) - Vcmax
-        C <- Km * Ca * (g0 - Rd * (GSDIVA - g0)) - 
-          Vcmax * Ca * GammaStar * (GSDIVA - g0) + Vcmax * GammaStar
-        
-        CIC <- QUADP(A,B,C)
-        
-        # Solution when electron transport rate is limiting
-        A <- (Rd - VJ)*(GSDIVA - g0) - g0
-        B <- (Ca - 2. * GammaStar)*(g0 - Rd * (GSDIVA - g0)) + 
-          VJ * (GSDIVA - g0) * (Ca + GammaStar) - VJ
-        C <- 2. * GammaStar * Ca * (g0 - Rd * (GSDIVA - g0)) - 
-          VJ * Ca * GammaStar * (GSDIVA - g0) + VJ * GammaStar
-        
-        CIJ <- QUADP(A,B,C)
-        
-        # Taken from MAESTRA.
-        # Following calculations are used for both BB & BBL models.
-        # Solution when Rubisco activity is limiting
-        #A <- g0 + GSDIVA * (Vcmax - Rd)
-        #B <- (1. - Ca*GSDIVA) * (Vcmax - Rd) + g0 * 
-        #  (Km - Ca)- GSDIVA * (Vcmax*GammaStar + Km*Rd)
-        #C <- -(1. - Ca*GSDIVA) * (Vcmax*GammaStar + Km*Rd) - g0*Km*Ca
+        #A <- (Rd - Vcmax)*(GSDIVA - g0) - g0
+        #B <- (Ca - Km)*(g0 - Rd * (GSDIVA - g0)) + 
+        #  Vcmax * (GSDIVA - g0) * (Ca + GammaStar) - Vcmax
+        #C <- Km * Ca * (g0 - Rd * (GSDIVA - g0)) - 
+        #  Vcmax * Ca * GammaStar * (GSDIVA - g0) + Vcmax * GammaStar
         
         #CIC <- QUADP(A,B,C)
         
         # Solution when electron transport rate is limiting
-        #A <- g0 + GSDIVA * (VJ - Rd)
-        #B <- (1 - Ca*GSDIVA) * (VJ - Rd) + g0 * (2.*GammaStar - Ca)- 
-        #  GSDIVA * (VJ*GammaStar + 2.*GammaStar*Rd)
-        #C <- -(1 - Ca*GSDIVA) * GammaStar * (VJ + 2*Rd) - 
-        #  g0*2*GammaStar*Ca
+        #A <- (Rd - VJ)*(GSDIVA - g0) - g0
+        #B <- (Ca - 2. * GammaStar)*(g0 - Rd * (GSDIVA - g0)) + 
+        #  VJ * (GSDIVA - g0) * (Ca + GammaStar) - VJ
+        #C <- 2. * GammaStar * Ca * (g0 - Rd * (GSDIVA - g0)) - 
+        #  VJ * Ca * GammaStar * (GSDIVA - g0) + VJ * GammaStar
         
         #CIJ <- QUADP(A,B,C)
+        
+        # Taken from MAESTRA.
+        # Following calculations are used for both BB & BBL models.
+        # Solution when Rubisco activity is limiting
+        A <- g0 + GSDIVA * (Vcmax - Rd)
+        B <- (1. - Ca*GSDIVA) * (Vcmax - Rd) + g0 * 
+          (Km - Ca)- GSDIVA * (Vcmax*GammaStar + Km*Rd)
+        C <- -(1. - Ca*GSDIVA) * (Vcmax*GammaStar + Km*Rd) - g0*Km*Ca
+        
+        CIC <- QUADP(A,B,C)
+        
+        # Solution when electron transport rate is limiting
+        A <- g0 + GSDIVA * (VJ - Rd)
+        B <- (1 - Ca*GSDIVA) * (VJ - Rd) + g0 * (2.*GammaStar - Ca)- 
+          GSDIVA * (VJ*GammaStar + 2.*GammaStar*Rd)
+        C <- -(1 - Ca*GSDIVA) * GammaStar * (VJ + 2*Rd) - 
+          g0*2*GammaStar*Ca
+        
+        CIJ <- QUADP(A,B,C)
         return(c(CIJ,CIC))
       }
       
@@ -867,20 +911,20 @@ Photosyn_custom2 <- function(VPD=1.5,
     # Photosynthetic rates, without or with mesophyll limitation
     if(is.null(gmeso) || gmeso < 0){
       # Get photosynthetic rate  
-      Ac <- Vcmax*(CIC - GammaStar)/(CIC + Km)
-      Aj <- VJ * (CIJ - GammaStar)/(CIJ + 2*GammaStar)
-      #A <- 1
-      #BC <- Rd - Vcmax - (CIC + Km) * GSDIVA / (Patm * 1e3)
-      #CC <- (Vcmax * (CIC - GammaStar) - (CIC + Km) * Rd) * GSDIVA / (Patm * 1e3)
-      #Ac <- mapply(QUADP, A=A,B=BC,C=CC)
+      #Ac <- Vcmax*(CIC - GammaStar)/(CIC + Km)
+      #Aj <- VJ * (CIJ - GammaStar)/(CIJ + 2*GammaStar)
+      A <- 1
+      BC <- Rd - Vcmax - (CIC + Km) * GSDIVA / (Patm * 1e3)
+      CC <- (Vcmax * (CIC - GammaStar) - (CIC + Km) * Rd) * GSDIVA / (Patm * 1e3)
+      Ac <- mapply(QUADP, A=A,B=BC,C=CC)
       
-      #BJ <- Rd - Jmax - (CIJ + 2. * GammaStar) * GSDIVA / (Patm * 1e3)
-      #CJ <- (Jmax * (CIJ - GammaStar) - (CIJ + 2. * GammaStar) *
-      #         Rd) * GSDIVA / (Patm * 1e3)
-      #Aj <- mapply(QUADP, A=A,B=BJ,C=CJ)
+      BJ <- Rd - Jmax - (CIJ + 2. * GammaStar) * GSDIVA / (Patm * 1e3)
+      CJ <- (Jmax * (CIJ - GammaStar) - (CIJ + 2. * GammaStar) *
+               Rd) * GSDIVA / (Patm * 1e3)
+      Aj <- mapply(QUADP, A=A,B=BJ,C=CJ)
       
-      #Ac <- Ac + Rd
-      #Aj <- Aj + Rd
+      Ac <- Ac + Rd
+      Aj <- Aj + Rd
       
     } else {
       # Ethier and Livingston (2004) (Equation 10).
@@ -927,7 +971,7 @@ Photosyn_custom2 <- function(VPD=1.5,
   
   
   # Hyperbolic minimum.
-  Am <- -mapply(QUADP, A = 1 - 1E-04, B = Ac+Aj, C = Ac*Aj)
+  Am <- -mapply(QUADP, A = 1 - 1E-04, B = -(Ac+Aj), C = Ac*Aj)
   
   # Another hyperbolic minimum with the transition to TPU
   tpulim <- any(Ap < Am)
@@ -1005,7 +1049,7 @@ calc_costgain_netorig = function (P = NULL, b = -2.5, c = 2, Amax_gross = NULL, 
           kmax_25 = 4, Tair = 25, VPD = 1.5, ratiocrit = 0.05, PPFD = 1000, 
           Patm = 101.325, Wind = 2, Wleaf = 0.01, LeafAbs = 0.5, Tcrit = 50, 
           T50 = 51, Ca = 420, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
-          Rd0 = 0.92, TrefR = 25, ...) 
+          Rd0 = 1.115, TrefR = 25, ...) 
 {
   if(is.null(P)) {
     return(NULL)
@@ -1013,15 +1057,168 @@ calc_costgain_netorig = function (P = NULL, b = -2.5, c = 2, Amax_gross = NULL, 
   HC = hydraulic_cost(P, b, c, kmax_25, Tair, ratiocrit, constant_kmax)
   TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
                     Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax)
-  CG_net = C_gain(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
+  CG_net = C_gain_corr(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
                   Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax, 
                   net = TRUE, Rd0, TrefR, netOrig = TRUE, ...)
-  CG_gross = C_gain(P, b, c, Amax_gross, kmax_25, Tair, VPD, 
+  CG_net_uncorr = C_gain(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
+                       Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax, 
+                       net = TRUE, Rd0, TrefR, netOrig = TRUE, ...)
+  CG_gross = C_gain_corr(P, b, c, Amax_gross, kmax_25, Tair, VPD, 
                     PPFD, Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax, 
                     net = FALSE, Rd0, TrefR, ...)
-  cost_gain = c(HC, TC, CG_net, CG_gross)
-  ID = c(rep("HC", length(HC)), rep("TC", length(TC)), rep("CG_net", 
-                                                           length(CG_net)), rep("CG_gross", length(CG_gross)))
+  RC = respiratory_cost(P, b, c, Amax = NULL, kmax_25, Tair, VPD, PPFD,
+                        Patm, Wind, Wleaf, LeafAbs, constant_kmax, Rd0, TrefR)
+  cost_gain = c(HC, TC, CG_net, CG_net_uncorr, CG_gross, RC)
+  ID = c(rep("HC", length(HC)), rep("TC", length(TC)), 
+         rep("CG_net", length(CG_net)), rep("CG_net_uncorr", length(CG_net_uncorr)), 
+         rep("CG_gross", length(CG_gross)),
+         rep("RC", length(RC)))
   df = data.frame(P, ID, cost_gain)
   return(df)
 }
+
+# Function to fit temperature response of Vcmax 
+# by Dushan Kumarathunge
+# inputs; dat is a dataframe with Vcmax, Tleaf in Kelvin (named as "TsK")
+# return; "Arr" for fitted Arrhenius model parameters, "Peak" for fitted Peak Arrhenius parameters
+fitpeaked<-function(dat,return=c("Arr","Peak"),start=list(k25=100, Ea=60, delS = 0.64)){
+  
+  return <- match.arg(return)
+  
+  try(Vc<-nls(fVc, start=start, data=dat))
+  Vc2<-summary(Vc)
+  res1<-data.frame(cbind(Vc2$coefficients[1],Vc2$coefficients[2],Vc2$coefficients[3],Vc2$coefficients[4],Vc2$coefficients[5],
+                         Vc2$coefficients[6]))
+  
+  names(res1)[1:6]<-c("Vcmax25","EaV","delsV","Vcmax25.se","EaV.se","delsV.se")
+  
+  try(Vr<-nls(fVc.a, start = list(k25=100, Ea=40), data = dat))
+  Vr2<-summary(Vr)
+  res<-data.frame(cbind(Vr2$coefficients[1],Vr2$coefficients[2],Vr2$coefficients[3],Vr2$coefficients[4]))
+  
+  
+  names(res)[1:4]<-c("Vcmax25","EaV","Vcmax25.se","EaV.se")
+  
+  
+  an<-anova(Vr,Vc)
+  AIC_Arr<-AIC(Vr)
+  AIC_Peak<-AIC(Vc)
+  prob_V<-an[[6]][[2]]
+  
+  
+  r1<-cor(fitted(Vc),dat$Vcmax)
+  R2_Peak<-r1*r1
+  
+  r2<-cor(fitted(Vr),dat$Vcmax)
+  R2_Arr<-r2*r2
+  
+  #test for normality of residuals
+  rest<-residuals(Vc)
+  norm<-shapiro.test(rest)
+  s<-norm$statistic
+  pvalue<-norm$p.value
+  
+  topt<-200/(res1[[3]]-0.008314*log(res1[[2]]/(200-res1[[2]])))
+  Topt<-topt-273.15
+  
+  Topt.se <- topt * 
+    sqrt(res1[[6]]**2 + 
+           (0.008314 * ((res1[[5]] / res1[[2]])**2 + (res1[[5]] / (200 - res1[[2]]))**2))**2) /
+    (res1[[3]]-0.008314*log(res1[[2]]/(200-res1[[2]])))
+  
+  
+  param_peak<-cbind(res1,Topt,Topt.se,R2_Arr,R2_Peak,AIC_Arr,AIC_Peak,prob_V)
+  names(param_peak)[1:13]<-c("Vcmax25","EaV","delsV","Vcmax25.se","EaV.se","delsV.se","ToptV",
+                             "ToptV.se","R2_Arr","R2_Peak","AIC_Arr","AIC_Peak","prob_V")
+  
+  param_arr<-cbind(res,R2_Arr,R2_Peak,AIC_Arr,AIC_Peak,prob_V)
+  names(param_arr)[1:9]<-c("Vcmax25","EaV","Vcmax25.se","EaV.se","R2_Arr",
+                           "R2_Peak","AIC_Arr","AIC_Peak","prob_V")
+  
+  
+  if(return == "Peak")return(param_peak)
+  if(return == "Arr")return(param_arr)
+  
+}
+
+# Function to fit temperature response of Jmax 
+# by Dushan Kumarathunge
+# inputs; dat is a dataframe with Vcmax, Tleaf in Kelvin (named as "TsK")
+# return; "Arr" for fitted Arrhenius model parameters, "Peak" for fitted Peak Arrhenius parameters
+
+fitpeakedJ<-function(dat,return=c("Arr","Peak"),start=list(k25=100, Ea=60, delS = 0.64)){
+  return <- match.arg(return)
+  dat$TsK <- dat$Tleaf + 273.15
+  
+  try(Vj<-nls(fVJ, start = start, data = dat))
+  Vj2<-summary(Vj)
+  res1<-Vj2$coefficients[1:6]
+  names(res1)[1:6]<-c("Jmax25","Ea","delsJ","Jmax25.se","EaJ.se","delsJ.se")
+  
+  try(Vr<-nls(fVJ.a, start = list(k25=100, Ea=40), data = dat))
+  Vr2<-summary(Vr)
+  res<-Vr2$coefficients[1:4]
+  names(res)[1:4]<-c("Vcmax25","EaV","Vcmax25.se","EaV.se")
+  
+  
+  an<-anova(Vr,Vj)
+  AIC_Arr<-AIC(Vr)
+  AIC_Peak<-AIC(Vj)
+  prob_J<-an[[6]][[2]]
+  
+  
+  r1<-cor(fitted(Vj),dat$Jmax)
+  R2_Peak<-r1*r1
+  
+  r2<-cor(fitted(Vr),dat$Jmax)
+  R2_Arr<-r2*r2
+  
+  
+  
+  #test for normality of residuals
+  rest<-residuals(Vj)
+  norm<-shapiro.test(rest)
+  s<-norm$statistic
+  pvalue<-norm$p.value
+  
+  topt<-200/(res1[[3]]-0.008314*log(res1[[2]]/(200-res1[[2]])))
+  Topt<-topt-273.15
+  Topt.se <- topt * 
+    sqrt(res1[[6]]**2 + 
+           (0.008314 * ((res1[[5]] / res1[[2]])**2 + (res1[[5]] / (200 - res1[[2]]))**2))**2) /
+    (res1[[3]]-0.008314*log(res1[[2]]/(200-res1[[2]])))
+  
+  param_peak<-c(res1,Topt,Topt.se,R2_Arr,R2_Peak,AIC_Arr,AIC_Peak,prob_J)
+  names(param_peak)[1:13]<-c("Jmax25","EaJ","delsJ","Jmax25.se","EaJ.se","delsJ.se","ToptJ","ToptJ.se","R2_Arr","R2_Peak",
+                             "AIC_Arr","AIC_Peak","prob_J")
+  
+  param_arr<-c(res,R2_Arr,R2_Peak,AIC_Arr,AIC_Peak,prob_J)
+  names(param_arr)[1:9]<-c("Jmax25","EaJ","Jmax25.se","EaJ.se","R2_Arr",
+                           "R2_Peak","AIC_Arr","AIC_Peak","prob_J")
+  
+  
+  if(return == "Peak")return(param_peak)
+  if(return == "Arr")return(param_arr)
+  
+  #return(c(res,r2,s,pvalue))
+  #return(list(res))
+}
+
+# define peak Arrhenius model for Vcmax
+fVc <- as.formula(Vcmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)) * 
+                    (1+exp((298.15*delS - 200)/(298.15*0.008314))) / 
+                    (1+exp((TsK*delS-200)/(TsK*0.008314))))
+
+# define peak Arrhenius model for Jmax
+fVJ <- as.formula(Jmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)) * 
+                    (1+exp((298.15*delS - 200)/(298.15*0.008314))) / 
+                    (1+exp((TsK*delS-200)/(TsK*0.008314))))
+
+# define standard Arrhenius model for Vcmax
+
+fVc.a<-as.formula(Vcmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))
+
+
+# define standard Arrhenius model for Vcmax
+
+fVJ.a<-as.formula(Jmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))

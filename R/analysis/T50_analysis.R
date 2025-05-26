@@ -18,3 +18,9 @@ T50_data1 = T50_data %>%
   summarise(mean(T50_mean)) %>% 
   ungroup()
 T50_data1
+
+T50_data %>% 
+  filter(Date == "2016-11-04") %>% 
+  group_by(HW_treatment) %>% 
+  summarise(mean(T50_mean)) %>% 
+  ungroup()

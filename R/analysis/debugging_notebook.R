@@ -12,7 +12,7 @@ c = Weibull[1,2]
 Pcrit = calc_Pcrit(b, c)
 Ps = 0.25
 kmax_25 = 0.7
-Tair = 36.5
+Tair = 55
 VPD = 3
 PPFD = 1750
 Rd0 = 1.115
@@ -87,6 +87,28 @@ HC = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
 TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, 
                   Wind = 8, Wleaf = 0.01, LeafAbs = 0.5, 
                   Tcrit = 45.5, T50 = 47.5, constant_kmax = TRUE)
+CG_df = calc_costgain_netorig(P, b, c, Amax_gross = NULL, Amax_net = NULL, 
+                      kmax_25, Tair, VPD, PPFD = PPFD, 
+                      Patm = 101.325, Wind = 2, Wleaf = 0.01, LeafAbs = 0.5, Tcrit = 43, 
+                      T50 = 48, 
+                      Vcmax=34,EaV=51780,EdVC=2e5,delsC=640, 
+                      Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
+                      Rd0 = 1.115, constant_kmax = TRUE) 
+CG_df %>% 
+  #filter(ID != "CG_gross") %>% 
+  ggplot(aes(x = P, y = cost_gain, color = ID)) +
+  geom_point() +
+  theme_classic()
+CG_df %>%  
+  pivot_wider(names_from = ID, values_from = cost_gain) %>% 
+  mutate(profit_gr = CG_gross - (HC + RC + TC),
+         profit_n = CG_net - (HC + RC + TC),
+         cost = HC + RC + TC) %>% 
+  select(P, profit_gr, profit_n, cost, CG_gross, CG_net) %>% 
+  pivot_longer(cols = profit_gr:CG_net, names_to = "ID", values_to = "cost_gain") %>% 
+  ggplot(aes(x = P, y = cost_gain, color = ID)) + 
+  geom_point() +
+  theme_classic()
 
 # Solve optimization
 HC.m = marginal_GainCost(P, HC)
@@ -102,10 +124,10 @@ i_Sicangco2 = which.min(abs(CG_net2.m-CC.m)) # 185, more open stomata than Sperr
 # Plot gains minus costs
 plot(abs(CG_gross.m-HC.m), ylim = c(0, 1.5)) # Sperry
 points(abs(CG_net.m-CC.m), col = "orange") # Sicangco Anet
-points(abs(CG_net2.m-CC.m), col = "blue") # Sicangco Agross - Rd
+points(abs(CG_net2.m-CC.m), col = "lightblue") # Sicangco Agross - Rd
 
-plot(CG_net)
-points(CG_net2, col = "blue")
+plot(E, CG_net, col = "orange", pch = 19)
+points(x = E, y = CG_net2, col = "blue", pch = 19)
 
 # Predicted E and A for Sperry and Sicangco2
 # Sicangco2 predicts higher E, lower A
@@ -183,16 +205,20 @@ abline(h = Rd)
 
 ## Photosynthetic predictions over a range, including Ci #######################
 Photosyn_v = Vectorize(Photosyn_custom)
-Photo_out = Photosyn_v(Tleaf = Tleaf, GS = g_w, VPD = VPD, PPFD = PPFD, 
+Photo_out = Photosyn_v(Ca = 420, Tleaf = Tleaf, GS = g_w, VPD = VPD, PPFD = PPFD, 
            Vcmax=34,EaV=51780,EdVC=2e5,delsC=640, # add other VJ params
            Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)
 Cis_pred = unlist(Photo_out[1,]) # Calculated as Ci = Ca - Am/GC
 CICs_pred = unlist(Photo_out[15,]) # CICs calculated with Leuning 1990 quadratic
 As_pred = unlist(Photo_out[2,])
 
-plot(g_w, Cis_pred)
+
+plot(E, As_pred/g_w*1.6)
+plot(E, 420 - As_pred/g_w*1.6)
+plot(E, Cis_pred)
 plot(g_w, CICs_pred) # Near-constant, obviously not true! Needs gs dependency
 plot(g_w, As_pred) # Same thing for both Ac and Aj
+plot(Tleaf, As_pred)
 
 Photosyn_custom2(Tleaf = Tleaf[1], GS = g_w[1], VPD = VPD, PPFD = PPFD, 
            Vcmax=34,EaV=51780,EdVC=2e5,delsC=640, # add other VJ params
@@ -204,14 +230,25 @@ gs_vec = c(1, 1e-1, 1e-2, 1e-3, 1e-4)
 A_v_gs_preds = Photosyn_v(GS = gs_vec, Tleaf=44.5,VPD=4.4,
                           PPFD=1800,g1=g1,g0=g0,
                           Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-                          Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Ca = 420)
+                          Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Ca = 420#, Rd = 0
+                          )
 
 # Lower gs gives higher Aleaf?!
 A_preds = unlist(A_v_gs_preds[2,])
-plot(log(gs_vec), A_preds, ylim = c(-2, 5))
+Ci_preds = unlist(A_v_gs_preds[1,])
+
+plot(gs_vec, Ci_preds)
 
 # Note that this is only an issue with Ac, not Aj (which decreases as expected)
 Ac_preds = unlist(A_v_gs_preds[5,])
-points(log(gs_vec), Ac_preds, col = "blue")
 Aj_preds = unlist(A_v_gs_preds[6,])
-points(log(gs_vec), Aj_preds, col = "orange")
+
+data.frame(
+  gs = rep(gs_vec, times = 3), 
+  A = c(A_preds, Ac_preds, Aj_preds),
+  ID = rep(c("Anet", "Ac", "Aj"), each = length(gs_vec))) %>% 
+  ggplot(aes(x = gs, y = A, color = ID)) +
+  geom_point() +
+  theme_classic() +
+  scale_x_log10() +
+  scale_color_manual(values = c("Anet" = "black", "Ac" = "blue", "Aj" = "orange"))

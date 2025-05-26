@@ -11,6 +11,47 @@ SWC_df = clean_SWC(input_folder)
 SWC_df$DateTime_hr <- HIEv::nearestTimeStep(SWC_df$DateTime_hr,nminutes=30,"floor")
 #dat.hr <- doBy::summaryBy(.~DateTime_hr+chamber+T_treatment+HWtrt+combotrt,FUN=mean,keep.names=T,data=SWC_df)
 
+# Compare temperature measurements #############################################
+
+# Load data
+WTC4_temp_data = read.csv("data/in/raw/WTC_TEMP-PARRA_CM_TEMPERATURES-COMBINED_20161010-20161123_L1.csv")
+
+# Histogram of thermocouple, radiometer, and air temperatures
+WTC4_temp_data %>% 
+  ggplot() +
+  geom_histogram(aes(Tleaf), fill = "deeppink", alpha = 0.5) +
+  geom_histogram(aes(TargTempC_Avg), fill = "lightblue3", alpha = 0.5) +
+  geom_histogram(aes(Tair_al), fill = "grey", alpha = 0.5) +
+  theme_classic()
+
+# Tleaf vs Tair for thermocouple and radiometer data
+WTC4_temp_data %>% 
+  ggplot() +
+  geom_point(aes(x = Tair_al, y = Tleaf), color = "pink", shape = 1) +
+  geom_point(aes(x = Tair_al, y = TargTempC_Avg), color = "lightblue3", shape = 1) +
+  theme_classic() +
+  geom_abline(intercept = 0, slope = 1)
+
+# Thermocouple minus radiometer data
+## TC temps higher
+WTC4_temp_data %>% 
+  ggplot() +
+  geom_point(aes(x = TargTempC_Avg, y = Tleaf - TargTempC_Avg), color = "pink", shape = 1) +
+  #geom_point(aes(x = Tair_al, y = ), color = "lightblue3", shape = 1) +
+  theme_classic() +
+  geom_abline(intercept = 0, slope = 0)
+hist(WTC4_temp_data$Tleaf - WTC4_temp_data$TargTempC_Avg)
+
+WTC4_temp_data$DateTime <- as.POSIXct(WTC4_temp_data$DateTime,format="%Y-%m-%d %T",tz="GMT")
+
+temp_data = WTC4_temp_data %>% 
+  filter(DateTime >= min(fluxes_df$DateTime_hr) & DateTime <= max(fluxes_df$DateTime_hr)) %>% 
+  mutate(DateTime_hr = floor_date(DateTime, unit = "30 minutes")) %>% 
+  group_by(chamber, DateTime_hr) %>% 
+  summarise(across(c("Tleaf", "TargTempC_Avg"), mean)) %>% 
+  ungroup() %>% 
+  as.data.frame()
+
 
 # Clean flux data ##############################################################
 # Load flux data
@@ -21,6 +62,21 @@ fluxes_df = read.csv(
   select(-PPFD_Avg)
 
 fluxes_df$DateTime_hr <- as.POSIXct(fluxes_df$DateTime_hr,format="%Y-%m-%d %T",tz="GMT")
+
+# Add thermocouple data
+temp_data = WTC4_temp_data %>% 
+  filter(DateTime >= min(fluxes_df$DateTime_hr) & DateTime <= max(fluxes_df$DateTime_hr)) %>% 
+  mutate(DateTime_hr = floor_date(DateTime, unit = "30 minutes")) %>% 
+  group_by(chamber, DateTime_hr) %>% 
+  summarise(across(c("Tleaf", "TargTempC_Avg"), mean)) %>% 
+  ungroup() %>% 
+  as.data.frame()
+fluxes_df = left_join(fluxes_df, temp_data, by = c("chamber", "DateTime_hr"))
+
+# Test that radiometer temperatures match - yes
+plot(fluxes_df$Tcan - fluxes_df$TargTempC_Avg)
+fluxes_df = fluxes_df %>% dplyr::select(!TargTempC_Avg)
+
 fluxes_df$Tdiff <- with(fluxes_df,Tcan-Tair)
 
 # Calculate conductance as the simple ratio between Trans and VPD. But use leaf to air VPD. Leaf to air VPD tends to be greater than air VPD, as leaves tend to be warmer than air. Plot the relationships between photosynthesis, conductance, and leaftoairVPD. Note the shift in points at extreme temperatures and VPD in teh heatwave treatment, consistent with lower photosynthesis than would be expected given the measured gs.
@@ -104,7 +160,7 @@ WTC4_data$Ps[WTC4_data$chamber == "C11"] = max(WTC4_data$Ps[WTC4_data$chamber ==
 
 # Write csv of final data frame for analysis
 write.csv(WTC4_data, "data/in/WTC4_data.csv", row.names = FALSE)
-
+test = read.csv("data/in/WTC4_data.csv")
 # Alternative estimation of Ps from soil water retention curve
 theta_sat = 0.185 # m3 m-3
 bch = 4

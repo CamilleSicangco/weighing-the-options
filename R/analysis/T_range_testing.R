@@ -93,29 +93,18 @@ make_pred.1 = function(Tair, model) {
 }
 
 # Environment
-Tair_vec = seq(30,55, by = 1)
-PPFD = 700
-VPD = 1.5
-kmax = 1.5
-Ps = 2
-Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, kmax = kmax,
-                         Ps = Ps)
-out = make_pred(Tair_sim.df)
-
-# Make predictions (Sperry and Sicangco)
-#make_pred(Tair = 50, "Sperry") # test for one Tair
-models = c("Sperry", "Sicangco")
-sims_vec = data.frame(Tair = rep(Tair_vec, each = 2), 
-                      model = rep(models, times = length(Tair_vec)))
-out.1 = mapply(make_pred.1, sims_vec$Tair, sims_vec$model) # multiple Tair's
-out.1 = data.frame(t(out.1))
-names(out.1) = c("Model", "Tair", "P", "E", "Tleaf", "Dleaf", "gs", "A")
-out.1 = out.1 %>% mutate(across(Tair:A, as.numeric))
+Tair_vec = seq(30,50, by = 1)
+Ps_vec = seq(0, 4, by = 0.2)
+Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = 700, VPD = 1.5, kmax = 0.7,
+                         Ps = 0.5, HWtrt = "HW")
+out = make_pred(df = Tair_sim.df, models = "final", LeafAbs = 0.5, 
+                Tcrit_hw = 43.4, T50_hw = 49.6, P50 = 4.07, P88 = 5.50,
+                Wind = 0.5, Wleaf = 0.01) 
 
 # Make Medlyn predictions
 Medlyn_preds = plantecophys::PhotosynEB(Tair=Tair_vec,
                           VPD=VPD,
-                          Wind=8,Wleaf=0.01,StomatalRatio=1, LeafAbs=0.86,
+                          Wind=8,Wleaf=0.01,StomatalRatio=1, LeafAbs=0.5,
                           PPFD=PPFD,g1 = 2.9,g0=0.003,
                           Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
                           Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)
@@ -125,20 +114,23 @@ Medlyn_preds_sim = Medlyn_preds %>%
   select(Model, Tair, E, Tleaf, Dleaf, gs, A)
 
 # Combine all predictions
-out_all = bind_rows(out.1, Medlyn_preds_sim)
+out_all = bind_rows(out, Medlyn_preds_sim)
 
 # Plot predictions #############################################################
 
-# gs vs Tair
-out_all %>% ggplot(aes(x = Tair, y = gs, color = Model)) +
+# gs vs Tleaf
+out %>%
+  #filter(Tleaf > 40) %>% 
+  ggplot(aes(x = Tleaf, y = gs, color = Model)) +
   geom_point(size = 3) + geom_line(size = 1) +
   theme_classic() +
   ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
-  xlab(expression("T"[air]*" (\u00B0C)")) +
+  xlab(expression("T"[leaf]*" (\u00B0C)")) +
   scale_color_manual(values = c("Sicangco" = "#FFC107", "Sperry" = "#1E88E5", Medlyn = "#D81B60"))+
   theme(text = element_text(size = 20),
         axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0)),
-        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)))
+        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0))) #+
+  #ylim(0,0.08)
 
 # Tleaf vs Tair
 r = 2/(T50 - Tcrit)

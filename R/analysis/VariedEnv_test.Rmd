@@ -136,22 +136,26 @@ plot_marginal = function(df, inclRC = FALSE)
 Here we evaluate the impact of increasing air temperature for a given soil water potential. We set SWP = -3 MPa and evaluate what happens when the air temperature rises from 44$^\circ$C to 47$^\circ$C, then to 50 $^\circ$C.
 ```{r environment1, echo=FALSE}
 # Environment
-Tair_l = 45
-Tair_m = 50
-Tair_h = 55
+Tair_l = 30
+Tair_m = 38
+Tair_h = 42
 Ps = 2
 VPD = 1.5
 PPFD = 700
 
 # Thermal damage
-Tcrit = 48.574
-  T50 = 50.17
+Tcrit = 43
+T50 = 48
+
+# Energy balance
+Wind = 0.5
+Wleaf = 0.1
 
 # Hydraulics
-Weibull = fit_Weibull(P50 = 4.31, P88 = 6.64)
+Weibull = fit_Weibull(P50 = 4.47, P88 = 5.50)
 b = Weibull[1,1]
 c = Weibull[1,2]
-kmax_25 = 1.5
+kmax_25 = 0.7
 Pcrit = calc_Pcrit(b, c)
 P = Ps_to_Pcrit(Ps, Pcrit)
 
@@ -165,13 +169,16 @@ We first plot the cost and gain functions. The carbon gain is plotted in terms o
 ```{r costgain1, echo=FALSE}
 cost_gain_h = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                             Tair = Tair_h, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE,Wind = Wind, 
+                    Wleaf = Wleaf)
 cost_gain_m = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                             Tair = Tair_m, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE, Wind = Wind, 
+                   Wleaf = Wleaf)
 cost_gain_l = calc_costgain(P, b, c, kmax_25 = kmax_25, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                             Tair = Tair_l, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE,Wind = Wind, 
+                    Wleaf = Wleaf)
 
 cost_gain = bind_rows(cost_gain_h, cost_gain_l, .id = "Tair")
 cost_gain$Tair[cost_gain$Tair == 1] = Tair_h
@@ -189,13 +196,13 @@ Now we plot the difference between the carbon gain minus either the hydraulic co
 ```{r opt1, echo=FALSE}
 GminC_l = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                          kmax_25 = kmax_25, Tair = Tair_l, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE)
 GminC_m = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                          kmax_25 = kmax_25, Tair = Tair_m, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE)
 GminC_h = gain_min_costs(P, b, c, #Amax_net = Amax_net, Amax_gross = Amax_gross, 
                          kmax_25 = kmax_25, Tair = Tair_h, PPFD = PPFD, VPD = VPD,
-                          Tcrit = Tcrit, T50 = T50)
+                          Tcrit = Tcrit, T50 = T50, constant_kmax = TRUE)
 
 p_l = plot_GminC(GminC_l)
 p_m = plot_GminC(GminC_m)
