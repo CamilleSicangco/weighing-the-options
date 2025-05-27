@@ -248,8 +248,9 @@ Rd = Rd0 * exp(0.1012 * (heatwave$Tcan - TrefR) - 5e-04 * (heatwave$Tcan^2 - Tre
 pred1.hw <- PhotosynEB(Tair=heatwave$Tair,VPD=heatwave$VPD,
                        Wind=8,Wleaf=0.02,StomatalRatio=1,LeafAbs=0.5,
                        PPFD=heatwave$PPFD,g1=g1,g0=g0,
-                       Vcmax=36.4,EaV=62307,EdVC=2e5,delsC=640,
-                       Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=633, Ca = 420)
+                       Vcmax=36.4,EaV=62307,EdVC=2e5,delsC=639,
+                       Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Ca = 420,
+                       Rd0 = 0.92)
 
 
 pred1.hw$ALEAF = pred1.hw$ALEAF - Rd
@@ -305,7 +306,7 @@ summary(control$PPFD[which(pred3.hw$gs < 0)]) # Happens for low PPFD (< 52.5)
 
 
 # Save heatwave observations and predictions
-save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_varkmaxpt5_fittedTcritT50_JPhydraulics_Wind8_Wleafpt02_DKparams_CGnetorig.Rdata")
+save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_varkmaxpt5_fittedTcritT50_JPhydraulics_Wind8_Wleafpt02_DKparams_CGnetorig_5models.Rdata")
 load("data/out/heatwave_runs_kmaxpt6_fittedTcritT50_JPhydraulics_Wind3_Wleafpt01_CGnetorig.Rdata")
 
 ## Plot results ################################################################ 
@@ -327,9 +328,10 @@ data.frame(DateTime_hr = heatwave$DateTime_hr,
   geom_vline(xintercept = 0, linetype = "dashed")
 
 # Create summary data frame
-out.hw = data.frame(datetime = rep(heatwave$DateTime_hr, times = 4),
-                    chamber = rep(heatwave$chamber, times = 4),
-                    model = rep(c("observed", "Medlyn", "Sicangco", "Sperry"), each = nrow(heatwave)),
+out.hw = data.frame(datetime = rep(heatwave$DateTime_hr, times = 5),
+                    chamber = rep(heatwave$chamber, times = 5),
+                    model = rep(c("observed", "Medlyn", "Sperry", 
+                                  "Sperry + CGnet", "Sperry + CGnet + TC"), each = nrow(heatwave)),
                     E = c(heatwave$E, pred1.hw$ELEAF, pred2.hw$E),
                     A = c(heatwave$A, pred1.hw$ALEAF, pred2.hw$A),
                     gs = c(heatwave$gs, pred1.hw$gw, pred2.hw$gs),
@@ -337,9 +339,11 @@ out.hw = data.frame(datetime = rep(heatwave$DateTime_hr, times = 4),
                     Tleaf = c(heatwave$Tcan, pred1.hw$Tleaf, pred2.hw$Tleaf),
                     Pleaf = c(rep(NA, nrow(heatwave)), pred1.hw$Pleaf, pred2.hw$Pleaf),
                     Tair = c(heatwave$Tair, pred1.hw$Tair, pred2.hw$Tair),
-                    VPD = rep(heatwave$VPD, times = 4),
-                    PPFD = rep(heatwave$PPFD, times = 4)) 
-out.hw$model = factor(out.hw$model, levels = c("Sicangco", "Sperry", "Medlyn", "observed"))
+                    VPD = rep(heatwave$VPD, times = 5),
+                    PPFD = rep(heatwave$PPFD, times = 5)) 
+out.hw$model = factor(out.hw$model, levels = c("Sperry", "Sperry + CGnet", 
+                                               "Sperry + CGnet + TC", "Medlyn", 
+                                               "observed"))
 
 pred3.hw.reformat = pred3.hw %>% 
   select(!P) %>% 
@@ -351,18 +355,19 @@ out.hw.all = bind_rows(out.hw, pred3.hw.reformat)
 # Plot transpiration versus canopy temperature 
 # E too high for Sperry and Sicangco models, but trend is good
 # Notably this is exaggerated for chambers 7 and 9, which has an "increasing" trend in SWP
+palette = c(Sperry = "#88CCEE", "Sperry + CGnet" = "#332288", "Sperry + CGnet + TC" = "#DDCC77",
+            Medlyn = "#CC6677", observed = "black")
 EvT.hw = plotGAM(gam_E.hw, smooth.c = "Tcan") +
   geom_point(data = out.hw, aes(x = Tleaf, y = E, color = model), shape = 1, size = .5) +
   theme_classic() +
   scale_color_manual(
-    values = c("observed" = "black", "Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
+    values = palette) +
   xlab(expression("T"[leaf]*" (\u00B0C)")) +
   ylab(expression("E"*" (mmol m"^-2*"s"^-1*")")) + 
   guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
          linetype = "none") +
   theme(plot.title = element_blank())
-
+EvT.hw
 EvT.hw.all = plotGAM(gam_E.hw, smooth.c = "Tcan") +
   geom_point(data = out.hw.all, aes(x = Tleaf, y = E, color = model), shape = 1, size = .5) +
   theme_classic() +
