@@ -120,6 +120,7 @@ plot_costgain = function(df, separate = TRUE)
   return(p)
 }
 
+# Plot net profit
 plot_profit = function(df) {
   linetype = c(Sperry = "solid", CGnet = "dashed", CGnet_TC = "dotted",
                CGnet_TC_RC = "dotdash")

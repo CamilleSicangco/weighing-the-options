@@ -37,30 +37,29 @@ make_pred = function(models = c("final", "intermediate"),
                      df, Wind = 8, Wleaf = 0.01, LeafAbs=0.5,
                      Tcrit_c = 42.6, Tcrit_hw = 44.4,
                      T50_c = 48.6, T50_hw = 50.4,...) {
-  if (models == "final") {
-    model1 = "Sicangco"
-    model2 = "Sperry"
-  } else if (models == "intermediate") {
-    model1 = "Sperry + CGnet"
-    model2 = "Sperry + TC"
-  }
-  # Generate Sicangco (or Sperry + CGnet) model predictions
-  preds1 = make_pred_fn2(model = model1, df = df, Wind = Wind, Wleaf = Wleaf,
+
+  # Generate Sperry model predictions
+  preds1 = make_pred_fn2(model = "Sperry", df = df, Wind = Wind, Wleaf = Wleaf,
                          LeafAbs = LeafAbs, Tcrit_c = Tcrit_c, Tcrit_hw = Tcrit_hw,
                          T50_c = T50_c, T50_hw = T50_hw,...)
   
-  # Generate Sperry (or Sperry + TC) model predictions
-  preds2 = make_pred_fn2(model = model2, df = df, Wind = Wind, Wleaf = Wleaf,
+  # Generate Sperry + CGnet model predictions
+  preds2 = make_pred_fn2(model = "Sperry + CGnet", df = df, Wind = Wind, Wleaf = Wleaf,
+                         LeafAbs = LeafAbs, Tcrit_c = Tcrit_c, Tcrit_hw = Tcrit_hw,
+                         T50_c = T50_c, T50_hw = T50_hw,...)
+
+  # Generate Sperry + CGnet + TC model predictions
+  preds3 = make_pred_fn2(model = "Sperry + CGnet + TC", df = df, Wind = Wind, Wleaf = Wleaf,
                          LeafAbs = LeafAbs, Tcrit_c = Tcrit_c, Tcrit_hw = Tcrit_hw,
                          T50_c = T50_c, T50_hw = T50_hw,...)
   
-  preds = bind_rows(preds1, preds2)
+  preds = bind_rows(preds1, preds2, preds3)
   return(preds)
 }
 
 # Generate predictions for multiple observations for one model
 make_pred_fn2 = function(
-    model = c("Sicangco", "Sperry", "Sperry + CGnet", "Sperry + TC"),
+    model = c("Sperry", "Sperry + CGnet", "Sperry + CGnet + TC"),
     df, 
     Wind = 8,
     Wleaf = 0.01,
@@ -69,10 +68,11 @@ make_pred_fn2 = function(
     Tcrit_hw = 44.4,
     T50_c = 48.6,
     T50_hw = 50.4,
+    kmax_25 = 0.7,
     ...) {
   # Generate model predictions
   preds = mapply(make_pred_fn, Tair = df$Tair, Ps = df$Ps, VPD = df$VPD,
-                 PPFD = df$PPFD, kmax_25 = df$kmax, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+                 PPFD = df$PPFD, kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
                  model = model, 
                  Tcrit = ifelse(df$HWtrt == "HW", Tcrit_hw, Tcrit_c), 
                  T50 = ifelse(df$HWtrt == "HW", T50_hw, T50_c),
@@ -99,6 +99,7 @@ make_pred_fn = function(Tair,
                         Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
                         Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
                         model,
+                        constant_kmax = TRUE,
                         ...) {
   
 
@@ -108,7 +109,7 @@ make_pred_fn = function(Tair,
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
   P = Ps_to_Pcrit(Ps, Pcrit)
-  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
+  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = constant_kmax)
   
   # Calculate Amax values
   #Tair_range = seq(30,50, by = 0.5)
@@ -125,7 +126,7 @@ make_pred_fn = function(Tair,
                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
                             Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
                             Rd0 = Rd0,
-                            constant_kmax = FALSE#, 
+                            constant_kmax = constant_kmax#, 
    #                         Amax_net = Amax_net, Amax_gross = Amax_gross
                             )
   cost_gain = cost_gain %>% 
@@ -133,10 +134,10 @@ make_pred_fn = function(Tair,
   # Solve optimization
   i = if (model == "Sperry") {
     which.max(cost_gain$CG_gross - cost_gain$HC)
-  } else if (model == "Sicangco") {
+  } else if (model == "Sperry + CGnet + TC") {
     which.max(cost_gain$CG_net_uncorr - (cost_gain$HC + cost_gain$TC))
   } else if (model == "Sperry + CGnet") {
-    which.max(cost_gain$CG_net - cost_gain$HC)
+    which.max(cost_gain$CG_net_uncorr - cost_gain$HC)
   } else if (model == "Sperry + TC") {
     which.max(cost_gain$CG_gross - (cost_gain$HC + cost_gain$TC))
   } else {

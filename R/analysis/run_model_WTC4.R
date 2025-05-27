@@ -261,7 +261,7 @@ pred1.hw$Tdiff <- with(pred1.hw,Tleaf-Tair)
 
 # Add kmax values to the data frame
 #heatwave = left_join(heatwave, kmax_df, by = "chamber") #%>% rename(Tair = Tair, PPFD = PPFD)
-heatwave = heatwave %>% mutate(kmax = 0.5)
+#heatwave = heatwave %>% mutate(kmax = 0.7)
 
 heatwave_subset = heatwave %>% 
   filter(Tleaf >= 33) %>% 
@@ -277,9 +277,10 @@ heatwave_subset = heatwave %>%
 # Generate predictions
 pred2.hw = make_pred(df = heatwave, models = "final", 
                      Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50,
-                     Wind = 3, Wleaf = 0.01,
+                     Wind = 8, Wleaf = 0.02,
                      Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92) # Really slow! Try to optimize
+                     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
+                     kmax_25 = 0.7, constant_kmax = FALSE) # Really slow! Try to optimize
 #pred2.hw = make_pred(df = heatwave, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
 
 plot(pred2.hw$Tleaf, pred2.hw$E)
