@@ -24,3 +24,9 @@ T50_data %>%
   group_by(HW_treatment) %>% 
   summarise(mean(T50_mean)) %>% 
   ungroup()
+
+T50_data %>% 
+  filter(HW_treatment == "heatwave") %>% 
+  group_by(Date) %>% 
+  summarise(mean(T50_mean), sd(T50_mean)) %>% 
+  ungroup()

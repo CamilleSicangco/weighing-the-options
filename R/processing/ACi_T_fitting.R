@@ -11,7 +11,7 @@ ACi_params = read.csv("data/in/raw/PPC-TGlob_V1.0.csv") %>%
   mutate(TsK = Tleaf + 273.15)
 ACi_params.l = split(ACi_params, ACi_params$Chamber)
 
-ACi_params %>% ggplot(aes(x = Tleaf, y = Vcmax)) +
+ACi_params %>% ggplot(aes(x = Tleaf, y = Jmax)) +
   geom_point() +
   theme_classic() +
   facet_wrap(vars(Chamber))

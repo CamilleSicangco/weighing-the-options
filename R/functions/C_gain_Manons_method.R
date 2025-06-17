@@ -16,7 +16,13 @@ C_gain_corr = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
   } else {
     Amax
   }
-  gain = A/Amax
+
+  gain = 
+    if (!is.na(Amax) & Amax != 0) {
+      A/Amax
+    } else {
+      rep(0, length = length(A))
+    }
   return(gain)
 }
 

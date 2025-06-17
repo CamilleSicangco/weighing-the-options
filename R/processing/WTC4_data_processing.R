@@ -108,7 +108,6 @@ WP_df = read.csv(
 predawn_df = WP_df %>% filter(Timing == "pre-dawn")
 predawn_df$Date = as.Date(predawn_df$Date)
 predawn_df$day = as.numeric(as.Date(predawn_df$Date) - as.Date(starttime))
-
   
 # Filter out pre-drought measure - don't do, causes most fits to have positive slope
 #predawn_df = predawn_df %>% filter(Date != "2016-10-19")

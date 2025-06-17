@@ -10,12 +10,12 @@ Weibull = fit_Weibull(P50, P88)
 b = Weibull[1,1]
 c = Weibull[1,2]
 Pcrit = calc_Pcrit(b, c)
-Ps = 0.25
+Ps = 0.5
 kmax_25 = 0.7
-Tair = 55
-VPD = 3
-PPFD = 1750
-Rd0 = 1.115
+Tair = 42
+VPD = 1.5
+PPFD = 1500
+Rd0 = 0.92
 TrefR = 25
 
 # Calculate physiological variables
@@ -173,7 +173,7 @@ TKm <- function(Tleaf, Patm,
   return(Km)
 }
 
-TVcmax <- function(Tleaf, EaV, delsC, EdVC){
+TVcmax_updated <- function(Tleaf, EaV, delsC, EdVC, Tcrit = 43.4){
   
   if(EdVC > 0){
     V1 <- 1+exp((delsC*(25 + 273.15)-EdVC)/(.Rgas()*(25 + 273.15)))
@@ -181,7 +181,21 @@ TVcmax <- function(Tleaf, EaV, delsC, EdVC){
     f <- V1/V2
   } else f <- 1
   
-  exp((Tleaf-25)*EaV/(.Rgas()*Tk(Tleaf)*Tk(25))) * f
+  V = ifelse(Tleaf < Tcrit, 
+             exp((Tleaf-25)*EaV/(.Rgas()*Tk(Tleaf)*Tk(25))) * f,
+             0)
+  return(V)
+}
+
+TJmax_updated <- function(Tleaf, EaJ, delsJ, EdVJ, Tcrit = 43.4){
+  J1 <- 1+exp((298.15*delsJ-EdVJ)/.Rgas()/298.15)
+  J2 <- 1+exp((Tk(Tleaf)*delsJ-EdVJ)/.Rgas()/Tk(Tleaf))
+  
+  J = ifelse(Tleaf < Tcrit, 
+             exp(EaJ/.Rgas()*(1/298.15 - 1/Tk(Tleaf)))*J1/J2,
+             0)
+  
+  return(J)
 }
 
 # Calculate Ac and Rd for a set temperature over a range of Cis
@@ -211,7 +225,14 @@ Photo_out = Photosyn_v(Ca = 420, Tleaf = Tleaf, GS = g_w, VPD = VPD, PPFD = PPFD
 Cis_pred = unlist(Photo_out[1,]) # Calculated as Ci = Ca - Am/GC
 CICs_pred = unlist(Photo_out[15,]) # CICs calculated with Leuning 1990 quadratic
 As_pred = unlist(Photo_out[2,])
+Ac_pred = unlist(Photo_out[5,])
+Aj_pred = unlist(Photo_out[6,])
 
+plot(Tleaf, As_pred)
+
+plot(Tleaf, Rd_pred, ylim = c(-0.1,7))
+points(Tleaf, Ac_pred, col = "orange")
+points(Tleaf, Aj_pred, col = "blue")
 
 plot(E, As_pred/g_w*1.6)
 plot(E, 420 - As_pred/g_w*1.6)
