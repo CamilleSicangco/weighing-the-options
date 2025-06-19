@@ -481,7 +481,7 @@ Photosyn_custom <- function(VPD=1.5,
     # When below light-compensation points, assume Ci=Ca.
     if(!inputCi){
       lesslcp <- vector("logical", length(Aj))
-      lesslcp <- Aj <= Rd + 1E-09
+      lesslcp <- Aj <= Rd + 1E-1
       
       if(length(Ca) == 1)Ca <- rep(Ca, length(CIJ))
       if(length(GammaStar) == 1)GammaStar <- rep(GammaStar, length(CIJ))
@@ -837,21 +837,21 @@ Photosyn_custom_oldTresp <- function(VPD=1.5,
     
     
     # When below light-compensation points, assume Ci=Ca.
-    if(!inputCi){
-      lesslcp <- vector("logical", length(Aj))
-      lesslcp <- Aj <= Rd + 1E-09
+    #if(!inputCi){
+     # lesslcp <- vector("logical", length(Aj))
+      #lesslcp <- Aj <= Rd + 1E-09
       
-      if(length(Ca) == 1)Ca <- rep(Ca, length(CIJ))
-      if(length(GammaStar) == 1)GammaStar <- rep(GammaStar, length(CIJ))
-      if(length(VJ) == 1)VJ <- rep(VJ, length(CIJ))
+      #if(length(Ca) == 1)Ca <- rep(Ca, length(CIJ))
+      #if(length(GammaStar) == 1)GammaStar <- rep(GammaStar, length(CIJ))
+      #if(length(VJ) == 1)VJ <- rep(VJ, length(CIJ))
       
-      CIJ[lesslcp] <- Ca[lesslcp]
-      Aj[lesslcp] <- VJ[lesslcp] * (CIJ[lesslcp] - GammaStar[lesslcp]) / 
-        (CIJ[lesslcp] + 2*GammaStar[lesslcp])
+      #CIJ[lesslcp] <- Ca[lesslcp]
+      #Aj[lesslcp] <- VJ[lesslcp] * (CIJ[lesslcp] - GammaStar[lesslcp]) / 
+       # (CIJ[lesslcp] + 2*GammaStar[lesslcp])
       
-      Ci <- ifelse(Aj < Ac, CIJ, CIC)
+      #Ci <- ifelse(Aj < Ac, CIJ, CIC)
       
-    }
+  #  }
   }
   
   # Limitation by triose-phosphate utilization

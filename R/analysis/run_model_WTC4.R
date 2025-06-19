@@ -534,21 +534,21 @@ out.hw %>%
   annotate("text", y=Tcrit, label="Tcrit", vjust = -0.5)
 
 out.hw %>% 
-  filter(Model != "observed") %>% 
-  ggplot(aes(x = Ps, y = Pleaf, color = Model)) +
+  filter(!(Model %in% c("Medlyn", "observed"))) %>% 
+  ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
   geom_point(shape = 1)+
-  scale_color_manual(values = palette[-6],
-                     labels = c("USO",
-                                "ProfitMax",
+  scale_color_manual(values = palette[-c(5,6)],
+                     labels = c("ProfitMax",
                                 expression("ProfitMax"[k[max](T)]),
                                 expression("ProfitMax"[net]),
                                 expression("ProfitMax"[TC])
                      )) +
   theme_classic() +
-  #xlab(expression("T"[leaf]*" (\u00B0C)")) +
+  xlab(expression("T"[leaf]*" (\u00B0C)")) +
   ylab(expression(Psi[leaf]*" (-MPa)")) + 
   guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none")
+         linetype = "none") +
+  theme(text = element_text(size = 16))
 ggsave("figs/PleafvT_kmaxpt7_fittedTcritT50_JPhydraulics.pdf")
 
 # Calculate TSM and HSM ########################################################

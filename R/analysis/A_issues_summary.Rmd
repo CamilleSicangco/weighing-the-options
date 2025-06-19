@@ -33,24 +33,24 @@ Weibull = fit_Weibull(P50 = 4.07, P88 = 5.50)
 b = Weibull[1,1]
 c = Weibull[1,2]
 Pcrit = calc_Pcrit(b, c)
-kmax_25 = 0.7
+kmax_25 = 0.5
 
 # Environmental variables
 Ps = 0.5
-Tair = 45
-VPD = 3
-PPFD = 1750
+Tair = 48
+VPD = 1.5
+PPFD = 1500
 
 # Respiration parameters
-Rd0 = 1.115
+Rd0 = 0.92
 TrefR = 25
 
 # Calculate physiological variables
 P = Ps_to_Pcrit(Ps, Pcrit)
-E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
-E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
+E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
+E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
 Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD, 
-                   E = E, Wind = 8, Wleaf = 0.01, 
+                   E = E, Wind = 8, Wleaf = 0.02, 
                    LeafAbs = 0.5)
 D_leaf = plantecophys::VPDairToLeaf(VPD = VPD, Tair = Tair, 
                                     Tleaf = Tleaf)
@@ -113,14 +113,14 @@ This solution has strange behaviour: it cannot achieve the case at moderately hi
 ```{r CG_netorig, echo=FALSE}
 # Net orig
 CG_netOrig = C_gain(P, b, c, Amax = NULL, kmax_25, Tair, VPD, PPFD, 
-                  Wind = 8, Wleaf = 0.01, LeafAbs = 0.5, 
+                  Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
                   Vcmax=34,EaV=51780,EdVC=2e5,delsC=640, 
                   Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633,
-                  constant_kmax = TRUE, net = TRUE, netOrig = TRUE)
+                  constant_kmax = FALSE, net = TRUE, netOrig = TRUE)
 
 # Calculate photosynthesis and associated variables
 Photosyn_v = Vectorize(Photosyn_custom)
-Photo_out = Photosyn_v(Ca = 420, GS = g_w, Tleaf = Tleaf, VPD = 3, PPFD = 1800,
+Photo_out = Photosyn_v(Ca = 420, GS = g_w, Tleaf = Tleaf, VPD = 1.5, PPFD = 1500,
                        Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                        Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635
                        )

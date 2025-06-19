@@ -59,7 +59,7 @@ ggsave(filename = "figs/composite_plot_41.3deg.pdf", width = 12.25, height = 6.5
 
 # Tair = 48
 cost_gain48 = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25, 
-                                    Tair = 45, PPFD = PPFD, VPD = VPD,
+                                    Tair = 48, PPFD = PPFD, VPD = VPD,
                                     Tcrit = Tcrit, T50 = T50, #constant_kmax = FALSE,
                                     Wind = 8, Wleaf = 0.02, LeafAbs = 0.5,
                                     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
