@@ -22,7 +22,7 @@ FigS2 = data.frame(Tair = rep(Tair_vec, 2),
                           expression(italic("J")["peakedArr"])
                         )) +
   guides(linetype = guide_legend(title = expression("J"[max])))
-ggsave("figs/FigS2_JvsT.pdf", FigS2, height = 6, width = 10)
+ggsave("figs/FigS2_JvsT.tiff", FigS2, height = 6, width = 10)
 
 # Fig S3: Predawn time series ##################################################
 predawn_LWP =  
@@ -40,7 +40,7 @@ FigS3 = ggplot(NULL, aes(x = date, y = Ps, color = chamber)) +
   xlab("Date") +
   ylab(expression("Predawn  "*psi[leaf]*" (MPa)")) +
   theme(text = element_text(size = 14))
-ggsave("figs/FigS3_Pleaf_timeseries.pdf", height = 6, width = 10)
+ggsave("figs/FigS3_Pleaf_timeseries.tiff", FigS3, height = 6, width = 10)
 
 # Fig S4: Cost, gain, and profit functions at Tair = 30 deg C ##################
 
@@ -51,7 +51,7 @@ cost_gain30 = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25,
                                     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                                     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 FigS4 = composite_plot(cost_gain30)
-ggsave(filename = "figs/FigS4_30deg_inst_sim.pdf", FigS4, width = 12.25, height = 6.5)
+ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", FigS4, width = 12.25, height = 6.5)
 
 # Fig S5: Predicted Ci vs Pleaf for Tair = 48 deg C, ProfitMax_net #############
 # Set hydraulic parameters
@@ -93,7 +93,7 @@ FigS5 = data.frame(P, Ci = Ci_pred) %>%
   ylab(expression("C"[i]*" (ppm)")) +
   theme(text = element_text(size = 14)) +
   geom_hline(yintercept = 420, linetype = "dashed")
-ggsave("figs/FigS5_Ci_vs_Pleaf.pdf", FigS5, width = 9, height = 6)
+ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6)
 
 # Fig S6: T50 sensitivity analysis #############################################
 
@@ -115,6 +115,6 @@ T50.plt = preds_varT50 %>%
          color = guide_legend(title = expression("T"[50]*" (\u00B0C)"))) +
   scale_colour_manual(values = palette) +
   theme(axis.title = element_text(size = 14))
-ggsave("figs/FigS6_SA_T50.pdf", T50.plt, height = 7, width = 11)
+ggsave("figs/FigS6_SA_T50.tiff", T50.plt, height = 7, width = 11)
 
 # TODO Fig S7: kmax sensitivity analysis ############################################
