@@ -37,16 +37,6 @@ plot(CG_net_uncorr)
 
 # Plots ------------------------------------------------------------------------
 
-# Tair = 30
-cost_gain30 = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25, 
-                                  Tair = 30, PPFD = PPFD, VPD = VPD,
-                                  Tcrit = Tcrit, T50 = T50, #constant_kmax = TRUE,
-                                  Wind = 8, Wleaf = 0.02, LeafAbs = 0.5,
-                                  Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                                  Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
-composite_plot(cost_gain30)
-ggsave(filename = "figs/composite_plot_30deg.pdf", width = 12.25, height = 6.5)
-
 # Tair = 40
 cost_gain41.3 = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25, 
                                   Tair = 41.3, PPFD = PPFD, VPD = VPD,

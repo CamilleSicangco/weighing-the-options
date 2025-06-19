@@ -79,21 +79,3 @@ Tcrit.plt = preds_varTcrit %>%
 Tcrit.plt
 ggsave("figs/SA_Tcrit.pdf", Tcrit.plt, height = 7, width = 11)
 
-preds_varT50 = make_pred_Tthresholds(Tair_sim.df, 
-                                     Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
-                                     kmax_25 = 0.5, constant_kmax = FALSE,
-                                     hold_Tcrit = TRUE,
-                                     Thold_val = 43.4,
-                                     Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
-
-T50.plt = preds_varT50 %>% 
-  ggplot(aes(x = Tleaf, y = gs, linetype = T50, color = T50)) + 
-  geom_line(linewidth = 1) + 
-  theme_classic() +
-  ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  guides(linetype = guide_legend(title = expression("T"[50]*" (\u00B0C)")),
-         color = guide_legend(title = expression("T"[50]*" (\u00B0C)"))) +
-  scale_colour_manual(values = palette) +
-  theme(axis.title = element_text(size = 14))
-ggsave("figs/SA_T50.pdf", T50.plt, height = 7, width = 11)
