@@ -97,81 +97,141 @@ make_pred_fn = function(Tair,
                         Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
                         Rd0 = 0.92,
                         model,
+                        Sperry_net_constrCi = FALSE,
                         #constant_kmax = TRUE,
                         ...) {
   
-
-  # Hydraulics
-  Weibull = fit_Weibull(P50, P88)
-  b = Weibull[1,1]
-  c = Weibull[1,2]
-  Pcrit = calc_Pcrit(b, c)
-  P = Ps_to_Pcrit(Ps, Pcrit)
-  E_vec_varkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
-  E_vec_constkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
   
-  # Compute costs and gains
-  cost_gain = calc_costgain_netorig(
-    P, b, c, kmax_25 = kmax_25, 
-    Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-    Tair = Tair, PPFD = PPFD, 
-    VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-    Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-    Rd0 = Rd0#,
-    #constant_kmax = constant_kmax, 
-    # Amax_net = Amax_net, Amax_gross = Amax_gross
-  )
-  cost_gain = cost_gain %>% 
-    pivot_wider(names_from = ID, values_from = cost_gain)
-  # Solve optimization
-  i = if (model == "Sperry") {
-    which.max(cost_gain$CG_gross - cost_gain$HC_constkmax)
-  } else if (model == "Sperry + varkmax") {
-    which.max(cost_gain$CG_gross_varkmax - cost_gain$HC_varkmax)
-  } else if (model == "Sperry + CGnet + TC") {
-    which.max(cost_gain$CG_net_newJT - (cost_gain$HC_varkmax + cost_gain$TC))
-  } else if (model == "Sperry + CGnet") {
-    which.max(cost_gain$CG_net - cost_gain$HC_varkmax)
-  } else if (model == "Sperry + TC") {
-    which.max(cost_gain$CG_gross_varkmax - (cost_gain$HC_varkmax + cost_gain$TC))
-  } else {
-    stop()
-  }
+    # Hydraulics
+    Weibull = fit_Weibull(P50, P88)
+    b = Weibull[1,1]
+    c = Weibull[1,2]
+    Pcrit = calc_Pcrit(b, c)
+    P = Ps_to_Pcrit(Ps, Pcrit)
+    E_vec_varkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
+    E_vec_constkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
+    
+    # Solve optimization
+    if (model == "Sperry") {
+      HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
+      CG_gross = C_gain_corr(P, b, c, kmax_25 = kmax_25,
+                             Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+                             Tair = Tair, PPFD = PPFD, 
+                             VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                             Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+                             Rd0 = Rd0,
+                             constant_kmax = TRUE, net = FALSE, new_JT = FALSE, 
+                              ...)
+      
+      i = which.max(CG_gross - HC_constkmax)
+    } else if (model == "Sperry + varkmax") {
+      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
+      CG_gross_varkmax = C_gain_corr(
+        P, b, c, kmax_25 = kmax_25,
+        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+        Tair = Tair, PPFD = PPFD, 
+        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+        constant_kmax = FALSE, net = FALSE, new_JT = FALSE, 
+        ...)
+      
+      i = which.max(CG_gross_varkmax - HC_varkmax)
+    } else if (model == "Sperry + CGnet + TC") {
+      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
+      TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
+                        Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
+      CG_net_newJT = C_gain_corr(
+        P, b, c, kmax_25 = kmax_25,
+        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+        Tair = Tair, PPFD = PPFD, 
+        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+        constant_kmax = FALSE, net = TRUE, new_JT = TRUE, netOrig = TRUE, 
+         ...)
+      
+      i = which.max(CG_net_newJT - (HC_varkmax + TC))
+    } else if (model == "Sperry + CGnet") {
+      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
+      CG_net = C_gain_corr(
+        P, b, c, kmax_25 = kmax_25,
+        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+        Tair = Tair, PPFD = PPFD, 
+        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+        constant_kmax = FALSE, net = TRUE, netOrig = TRUE, new_JT = FALSE,  
+        ...)
+      
+      i = which.max(CG_net - HC_varkmax)
+    } else if (model == "Sperry + TC") {
+      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
+      TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
+                        Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
+      CG_gross_varkmax = C_gain_corr(
+        P, b, c, kmax_25 = kmax_25,
+        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+        Tair = Tair, PPFD = PPFD, 
+        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+        constant_kmax = FALSE, net = FALSE, new_JT = FALSE,  
+        ...)
+      
+      i = which.max(CG_gross_varkmax - (HC_varkmax + TC))
+    } else if (model == "Sperry + CGnet_constrCi") {
+      HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
+      CG_constrCi = C_gain_alt(
+        P, b, c, Amax = NULL, kmax_25 = kmax_25,
+        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+        Tair = Tair, PPFD = PPFD, 
+        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
+        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+        constant_kmax = FALSE, new_JT = FALSE)
+      
+      i = which.max(CG_constrCi - HC_constkmax)
+    } else {
+      stop()
+    }
+    
+    E_vec = if (model %in% c("Sperry", "Sperry + CGnet_constrCi")) {
+      E_vec_constkmax
+    } else {
+      E_vec_varkmax
+    }
+    
+    P = P[i]
+    E = E_vec[i]
+    Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
+                       Wleaf = Wleaf, LeafAbs = LeafAbs)
+    Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
+    #gs = calc_gw(E = E, D_leaf = Dleaf)
+    gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
+                 PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
+    
+    #net = if (model == "Sperry") {
+    #  FALSE
+    #} else if (model == "Sicangco") {
+    #  TRUE
+    #} 
+    new_JT = if (model %in% c("Sperry + TC", "Sperry + CGnet + TC")) {
+      TRUE
+    } else {
+      FALSE
+    }
+    
+    A = calc_A_corr(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
+                    PPFD = PPFD, Wind = Wind, 
+                    Wleaf = Wleaf, LeafAbs = LeafAbs,
+                    Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT)
+    
+    out = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A)
   
-  E_vec = if (model == "Sperry") {
-    E_vec_constkmax
-  } else {
-    E_vec_varkmax
-  }
   
-  P = P[i]
-  E = E_vec[i]
-  Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
-                     Wleaf = Wleaf, LeafAbs = LeafAbs)
-  Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
-  #gs = calc_gw(E = E, D_leaf = Dleaf)
-  gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
-          PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
-  
-  #net = if (model == "Sperry") {
-  #  FALSE
-  #} else if (model == "Sicangco") {
-  #  TRUE
-  #} 
-  new_JT = if (model %in% c("Sperry + TC", "Sperry + CGnet + TC")) {
-    TRUE
-  } else {
-    FALSE
-  }
-  
-  A = calc_A_corr(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
-             PPFD = PPFD, Wind = Wind, 
-             Wleaf = Wleaf, LeafAbs = LeafAbs,
-             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-             Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT)
-  
-  out = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A)
   names(out) = c("model", "Tair", "Ps", "Pleaf", "E", "Tleaf", "Dleaf", "gs", "A")
   return(out)
 }
@@ -956,9 +1016,6 @@ calc_costgain_netorig = function (P = NULL, b = -2.5, c = 2, Amax_gross = NULL, 
                        Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = FALSE, 
                        net = TRUE, Rd0, TrefR, netOrig = TRUE, Tcrit = Tcrit, T50 = T50,
                        new_JT = FALSE, ...)
-  #CG_net_uncorr = C_gain(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
-  #                     Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax, 
-  #                     net = TRUE, Rd0, TrefR, netOrig = TRUE, ...)
   CG_gross = C_gain_corr(P, b, c, Amax_gross, kmax_25, Tair, VPD, 
                     PPFD, Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = TRUE, 
                     net = FALSE, Rd0, TrefR, Tcrit = Tcrit, T50 = T50,
@@ -967,9 +1024,8 @@ calc_costgain_netorig = function (P = NULL, b = -2.5, c = 2, Amax_gross = NULL, 
                          PPFD, Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = FALSE, 
                          net = FALSE, Rd0, TrefR, Tcrit = Tcrit, T50 = T50,
                          new_JT = FALSE, ...)
-  #RC = respiratory_cost(P, b, c, Amax = NULL, kmax_25, Tair, VPD, PPFD,
-  #                      Patm, Wind, Wleaf, LeafAbs, constant_kmax, Rd0, TrefR)
-  cost_gain = c(HC_constkmax, HC_varkmax, TC, CG_net, CG_net_newJT, CG_gross, CG_gross_varkmax)
+
+    cost_gain = c(HC_constkmax, HC_varkmax, TC, CG_net, CG_net_newJT, CG_gross, CG_gross_varkmax)
   ID = c(rep("HC_constkmax", length(HC_constkmax)),
          rep("HC_varkmax", length(HC_varkmax)),
          rep("TC", length(TC)), 
@@ -1209,8 +1265,7 @@ get_preds_theoretical_sims =
     Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
-    #constant_kmax = TRUE, 
-    kmax_25 = kmax_25, net = TRUE, netOrig = TRUE,
+    kmax_25 = kmax_25, #net = TRUE, netOrig = TRUE,
     g1 = 2.9,g0=0.003,
     ...
   ) {
@@ -1218,9 +1273,10 @@ get_preds_theoretical_sims =
                     Tcrit = Tcrit, T50 = T50, P50 = P50, P88 = P88,
                     Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
                     Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC, 
-                    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, Rd0 = Rd0, kmax_25 = kmax_25,
+                    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, 
+                    Rd0 = Rd0, kmax_25 = kmax_25,
                     #constant_kmax = constant_kmax, 
-                    net = net, netOrig = netOrig,
+                    #net = net, netOrig = netOrig,
                     ...) 
     
     # Make Medlyn predictions
@@ -1284,7 +1340,9 @@ calc_A_corr = function (Tair = 25, VPD = 1.5, PPFD = 1000, Patm = 101.325,
                           Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm, 
                           GS = g_w, Rd = 0, Jmax = Jmax, Vcmax = Vcmax, g1 = g1, 
                           g0 = g0, new_JT = new_JT, ...)
-    A = as.numeric(Photosyn_out[2, ])
+    Anet = as.numeric(Photosyn_out[2, ])
+    Rd = as.numeric(Photosyn_out[8, ])
+    A = Anet + Rd
   }
   else {
     if (isTRUE(netOrig)) {

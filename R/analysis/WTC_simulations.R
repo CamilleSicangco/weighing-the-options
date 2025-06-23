@@ -423,11 +423,11 @@ AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) +
           nrow = 2, ncol = 2, common.legend = TRUE, legend = "right")
 AEvT.plt = 
   annotate_figure(AEvT.plt,
-                bottom = text_grob(expression("T"[canopy]*" (\u00B0C)"), hjust = 1))
+                bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
 
 
 AEvT.plt
-ggsave(plot = AEvT.plt, filename = "figs/AEvT_plt_new.pdf", width = 8, height = 7)
+ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7)
 
 # gs vs Tleaf
 ggplot() +
@@ -469,16 +469,21 @@ Tleaf_pred_obs.plt =
                                 expression("ProfitMax"[net]),
                                 expression("ProfitMax"[TC])
                      )) +
-  xlab(expression("observed T"[canopy]*" (\u00B0C) from radiometer")) +
-  ylab(expression("predicted T"[canopy]*" (\u00B0C)")) + 
+  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
+  ylab(expression("predicted T"[leaf]*" (\u00B0C)")) + 
   guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank(),axis.title = element_text(size = 14)) + 
+         linetype = "none") + 
   geom_abline(slope = 1) +
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)))
-Tleaf_pred_obs.plt
-ggsave(plot = Tleaf_pred_obs.plt, filename = "figs/Tleaf_pred_vs_obs_all.pdf",
-       height = 7, width = 10)
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2))) + 
+  geom_vline(xintercept = 43.4, linetype = "dashed", colour = "darkorange") +
+  geom_hline(yintercept = 43.4, linetype = "dashed", colour = "darkorange") +
+  annotate("text", x=Tcrit, y = 10, label=expression("T"[crit]), hjust = -0.5, colour = "darkorange", size = 5)+ 
+  geom_vline(xintercept = 49.6, linetype = "dashed", colour = "orangered3") +
+  geom_hline(yintercept = 49.6, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x=T50, y = 10, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 5)+
+  theme(plot.title = element_blank(),text = element_text(size = 14)) 
+Tleaf_pred_obs.plt 
+ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11)
 
 out.hw %>% 
   pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
@@ -534,6 +539,29 @@ out.hw %>%
   annotate("text", y=Tcrit, label="Tcrit", vjust = -0.5)
 
 out.hw %>% 
+  #filter(!(Model %in% c("Medlyn", "observed"))) %>% 
+  ggplot(aes(x = Tleaf, y = gs, color = Model)) +
+  geom_point(shape = 1)+
+  scale_color_manual(values = palette,
+                     labels = c("Observed", "USO",
+                                "ProfitMax",
+                                expression("ProfitMax"[k[max](T)]),
+                                expression("ProfitMax"[net]),
+                                expression("ProfitMax"[TC])
+                     )) +
+  theme_classic() +
+  xlab(expression("T"[leaf]*" (\u00B0C)")) +
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
+         linetype = "none") +
+  theme(text = element_text(size = 16))
+
+out.hw %>% filter(Model == "Sperry + CGnet" #& Tleaf > 41.5 & Tleaf < 44
+                  ) %>% 
+  ggplot(aes(x = Tair, y = Tleaf, color = Model)) +
+  geom_point(shape = 1)
+summary(filter(out.hw, Model == "Sperry + varkmax")$Pleaf)
+
+Fig7_PleafvT = out.hw %>% 
   filter(!(Model %in% c("Medlyn", "observed"))) %>% 
   ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
   geom_point(shape = 1)+
@@ -548,8 +576,13 @@ out.hw %>%
   ylab(expression(Psi[leaf]*" (-MPa)")) + 
   guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
          linetype = "none") +
+  geom_hline(yintercept = 4.07, linetype = "dashed", colour = "darkorange") +
+  annotate("text", x = 20, y = P50, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
+  geom_hline(yintercept = P88, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x = 20, y = P88, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
   theme(text = element_text(size = 16))
-ggsave("figs/PleafvT_kmaxpt7_fittedTcritT50_JPhydraulics.pdf")
+Fig7_PleafvT
+ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
 
 # Calculate TSM and HSM ########################################################
 # TSM

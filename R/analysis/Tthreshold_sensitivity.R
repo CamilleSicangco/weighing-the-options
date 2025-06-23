@@ -77,5 +77,5 @@ Tcrit.plt = preds_varTcrit %>%
   scale_colour_manual(values = palette) +
   theme(axis.title = element_text(size = 14))
 Tcrit.plt
-ggsave("figs/SA_Tcrit.pdf", Tcrit.plt, height = 7, width = 11)
+ggsave("figs/Fig4_SA_Tcrit.tiff", Tcrit.plt, height = 7, width = 11)
 

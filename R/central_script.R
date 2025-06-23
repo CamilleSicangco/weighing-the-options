@@ -10,13 +10,6 @@ source("R/functions/data_processing_functions.R")
 source("R/functions/analysis_functions.R")
 source("R/functions/plotting_functions.R")
 
-# Replace TVcmax, TJmax with correction
-#environment(TVcmax_updated) <- asNamespace("plantecophys")
-#assignInNamespace("TVcmax", TVcmax_updated, ns = "plantecophys")
-
-#environment(TJmax_updated) <- asNamespace("plantecophys")
-#assignInNamespace("TJmax", TJmax_updated, ns = "plantecophys")
-
 # Replace plantecophys::Photosyn with custom version to use the Heskel et al. 2017 R(T) equation
 environment(Photosyn_custom) <- asNamespace("plantecophys")
 assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")

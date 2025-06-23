@@ -1,23 +1,6 @@
 # Model testing over a temperature range
 # by Camille Sicangco
 
-# Environment
-Tleaf_seq = seq(20,70, by = 1)
-
-Vcs = TVcmax(Tleaf_seq,EaV=62307,EdVC=2e5,delsC=639)
-Js = TVcmax(Tleaf_seq, EaV=33115,EdVC=2e5,delsC=635)
-
-Vcs_2 = TVcmax_updated(Tleaf_seq,EaV=62307,EdVC=2e5,delsC=639)
-Js_2 = TVcmax_updated(Tleaf_seq, EaV=33115,EdVC=2e5,delsC=635)
-
-plot(Tleaf_seq, Vcs)
-plot(Tleaf_seq, Js)
-
-plot(Tleaf_seq, Vcs_2)
-plot(Tleaf_seq, Js_2)
-
-
-
 ## Run simulations -------------------------------------------------------------
 
 # Environment
@@ -143,7 +126,7 @@ gsAPleafvsTleaf.plt =
   ) +
   theme(plot.margin = margin(t = 10, r = 10, b = 10, l = 10))
 ggsave(gsAPleafvsTleaf.plt,
-       filename = "figs/TheoreticalSims_gsAPleafvsTleaf_nopts.pdf", width = 12.25, height = 10)
+       filename = "figs/Fig1_TheoreticalSims_gsAPleafvsTleaf_nopts.tiff", width = 12.25, height = 10)
 
 # Plot A, E, and Dleaf vs Tleaf
 EDvsTleaf.plt = 

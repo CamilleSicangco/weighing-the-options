@@ -1,32 +1,5 @@
 # Modified C gain functions
 
-# Correction to C_gain
-C_gain_corr = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
-                        VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 2, Wleaf = 0.01, 
-                        LeafAbs = 0.5, Ca = 420, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
-                        net = FALSE, Rd0 = 0.92, TrefR = 25, netOrig = TRUE, ...) 
-{
-  E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
-  A = calc_A(Tair, VPD, PPFD, Patm, E, Wind, Wleaf, LeafAbs, 
-             Ca, Jmax, Vcmax, net, Rd0, TrefR, netOrig, ...)
-  E = ifelse(E == 0, NA, E)
-  A = ifelse(E == 0, NA, A)
-  Amax = if (is.null(Amax)) {
-    max(abs(A[!is.na(A)]))
-  } else {
-    Amax
-  }
-
-  gain = 
-    if (!is.na(Amax) & Amax != 0) {
-      A/Amax
-    } else {
-      rep(0, length = length(A))
-    }
-  return(gain)
-}
-
-
 # Manon/Venturas implementation
 C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
                        VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 2, Wleaf = 0.01, 
@@ -52,15 +25,13 @@ C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
   
   Es = t(array(E, dim = c(500, length(E))))
   
-  A_vCF1981 = Ca * (g_ws/1.6 - Es/1000/2) - Cis * (g_ws/1.6 + Es/1000/2)
-
   # Calculate demand A with Farqhuar model
   Tleaves = t(array(Tleaf, dim = c(500, length(E))))
   A_demand = as.numeric(mapply(Photosyn_custom, VPD = VPD, 
                         Ca = Ca, PPFD = PPFD, Tleaf = Tleaves, 
                         Patm = Patm, 
                         Ci = Cis, Jmax = Jmax, Vcmax = Vcmax,
-                        Rd0 = Rd0, TrefR = TrefR)[2,])
+                        Rd0 = Rd0, TrefR = TrefR, new_JT = FALSE)[2,])
   dim(A_demand) = c(500, 500)
   
   # Find which values of supply and demand A match closest for each value of E
