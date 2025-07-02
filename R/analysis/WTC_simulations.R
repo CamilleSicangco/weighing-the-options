@@ -2,20 +2,15 @@
 # by Camille Sicangco
 # Created 30 Sept 2024
 
-# Load data framehttp://127.0.0.1:29759/graphics/plot_zoom_png?width=515&height=769
+# Load data frame
 WTC4_data = read.csv("data/in/WTC4_data.csv")
 WTC4_data$DateTime_hr <- as.POSIXct(WTC4_data$DateTime_hr,format="%Y-%m-%d %T",tz="GMT")
 
-# Plot A-Tleaf response without filtering
-# Note that very few values of A < 0 occur at high temperatures
-WTC4_data %>% #filter(HWtrt == "HW") %>% 
-  ggplot(aes(x = Tleaf, y = A, color = HWtrt)) +
-  geom_point() +
-  theme_classic() +
-  geom_hline(yintercept = 0)
+# Fit models ###################################################################
 
-# Control data #################################################################
+## Control ---------------------------------------------------------------------
 
+### Process data ---------------------------------------------------------------
 # Subset the model predictions for the ambient treatment  
 control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 
@@ -41,179 +36,39 @@ prescE_long.c %>%
   theme_classic() +
   ggtitle("Control")
 
-## Fit GAM #####################################################################
+### Fitting --------------------------------------------------------------------
+
+# GAMs
 gam_E.c = gam(E ~ s(Tcan), data = control)
 gam_A.c = gam(A ~ s(Tcan), data = control)
 
-
-## Fit the Medlyn model ########################################################
-
-#- fit g1 and g0 for the "control" dataset
-gs_fits <- nls(gs ~ g0+1.6*(1+g1/sqrt(VPD))*(Photo/400),
-               start=list(g0=0.002,g1=4),
-               data=subset(control,PPFD>500),
+# Medlyn model: fit g1 and g0
+gs_fits <- nls(gs ~ g0 + 1.6*(1+g1/sqrt(VPD))*(A/400),
+               start=list(g0=0,g1=4),
+               data=subset(WTC4_data,HWtrt=="C" & PPFD > 500),
                algorithm="port",
-               lower=c(0,0),upper=c(0.003,10))
-
+               lower=c(0,0),upper=c(1e-9,10))
+coef(gs_fits)
 #g0 = unname(coef(gs_fits)[1])
 g1 = unname(coef(gs_fits)[2])
 #g0=0
-g1 = 2.9
+#g1 = 2.9
 g0=0.003
+g1 = 2.4
+b = 0.97
 
-# Fit the control treatment (i.e., not the heatwave trees)
-Rd0 = 0.92
-TrefR = 25
-Rd = Rd0 * exp(0.1012 * (control$Tcan - TrefR) - 5e-04 * (control$Tcan^2 - TrefR^2))
-pred1.c <- PhotosynEB(Tair=control$Tair,VPD=control$VPD,Wind=8,Wleaf=0.01,StomatalRatio=1,
-                    LeafAbs=0.5,
-                    PPFD=control$PPFD,g1=g1,g0=g0,
-                    Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-                    Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Rd = 0)
-pred1.c$P = get_Pleaves_Medlyn(pred1.c, P50 = P50, P88 = P88, 
-                                Ps = control$Ps, kmax_25 = 0.5, constant_kmax = TRUE)
+# Get gs model predictions
+pred.c = get_predictions(df = control, b_USO = 0, g1 = 2.9)
 
-table(pred1.c$failed) # Some energy balance calculations failed
-pred1.c$Tdiff <- with(pred1.c,Tleaf-Tair)
+pred.c$Tdiff <- with(pred.c,Tleaf-Tair)
 
-## Fit Sperry and Sicangco models ##############################################
-
-# Generate predictions
-pred2.c = make_pred(df = control,
-                    Tcrit = 43.4, T50 = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50,
-                    Wind = 8, Wleaf = 0.025,
-                    Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                    Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
-                    kmax_25 = 0.5) # Really slow! Try to optimize
-
-# Check if either model predicts negative gs values
-table(pred2.c$gs[pred2.c$Model == "Sicangco"] >= 0) # 158/2341 have negative gs
-table(pred2.c$gs[pred2.c$Model == "Sperry"] >= 0) # All predict positive gs
-summary(control$PPFD[which(pred2.c$gs < 0)]) # Happens for low PPFD (< 52.5)
-
-### Fit intermediate models, i.e. Sperry with either CGnet or TC ###############
-
-# Generate predictions
-pred3.c = make_pred(df = control, models = "intermediate") # Really slow! Try to optimize
-# Check if either model predicts negative gs values
-table(pred3.c$gs[pred3.c$Model == "Sperry + CGnet"] >= 0) # 158/2341 have negative gs
-table(pred3.c$gs[pred3.c$Model == "Sperry + TC"] >= 0) # All predict positive gs
-summary(control$PPFD[which(pred3.c$gs < 0)]) # Happens for low PPFD (< 52.5)
+# Check if any model predicts negative gs values
+sapply(unique(pred.c$Model), 
+      function(model) table(pred.c$gs[pred.c$Model == model] >= 0)) # all predict positive gs
 
 # Save control observations and predictions
-save(control, pred1.c, pred2.c, file = "data/out/control_runs_kmaxpt5_new.Rdata")
-load("data/out/control_runs_kmaxpt7_fittedTcritT50_JPhydraulics.Rdata")
-
-## Plot results ################################################################
-
-# Plot Tleaf predictions minus observations for all models
-Tdiff.Sic = subset(pred2.c, Model == "Sicangco")$Tleaf - control$Tcan
-Tdiff.Sp = subset(pred2.c, Model == "Sperry")$Tleaf - control$Tcan
-Tdiff.Med = pred1.c$Tleaf - control$Tcan
-
-# Plot Tdiff by model
-data.frame(DateTime_hr = control$DateTime_hr, 
-           Tdiff = c(Tdiff.Sic, Tdiff.Sp, Tdiff.Med), 
-           model = rep(c("Sicangco", "Sperry", "Medlyn"), each = nrow(control))) %>% 
-  ggplot(aes(x = Tdiff, color = model)) +
-  geom_density(alpha = 0.2, size = 1) +
-  #geom_histogram(aes(y=..density..), alpha=0.5, 
-  #               position="identity") +
-  theme_classic() +
-  geom_vline(xintercept = 0, linetype = "dashed")
-
-# Create summary data frame
-out.c = data.frame(datetime = rep(control$DateTime_hr, times = 6),
-                   chamber = rep(control$chamber, times = 6),
-                   Model = rep(c("observed", "Medlyn", "Sperry", 
-                                 "Sperry + varkmax", "Sperry + CGnet", 
-                                 "Sperry + CGnet + TC"),
-                               each = nrow(control)),
-                   E = c(control$E, pred1.c$ELEAF, pred2.c$E),
-                   A = c(control$A, pred1.c$ALEAF, pred2.c$A),
-                   gs = c(control$gs, pred1.c$gw, pred2.c$gs),
-                   Dleaf = c(control$Dleaf, pred1.c$VPDleaf, pred2.c$Dleaf),
-                   Tleaf = c(control$Tcan, pred1.c$Tleaf, pred2.c$Tleaf))
-
-out.c$Model = factor(out.c$Model, levels = c("observed", "Medlyn", "Sperry", 
-                                             "Sperry + varkmax", "Sperry + CGnet", 
-                                             "Sperry + CGnet + TC"))
-# Plot transpiration versus canopy temperature 
-# E too high for Sperry and Sicangco models, especially as Tleaf increases
-# Notably this is exaggerated for chamber 11, which has an increasing trend in SWP
-EvT.c = plotGAM(gam_E.c, smooth.c = "Tcan") +
-  geom_point(data = out.c, aes(x = Tleaf, y = E, color = Model), shape = 1, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "USO",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)]),
-               expression("ProfitMax"[net]),
-               expression("ProfitMax"[TC])
-    )) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("E"*" (mmol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank())
-EvT.c
-
-# Plot A versus canopy temperature 
-AvT.c = plotGAM(gam_A.c, smooth.c = "Tcan") +
-  geom_point(data = out.c, aes(x = Tleaf, y = A, color = Model), shape = 1, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "USO",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)]),
-               expression("ProfitMax"[net]),
-               expression("ProfitMax"[TC])
-    )) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("A (" * mu * "mol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") #+
-  #theme(plot.title = element_blank())
-AvT.c
-
-# Plot Tleaf predictions vs observations
-Tleaf_pred_obs.plt = out.c %>% 
-  pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
-  pivot_longer(cols = Medlyn:Sperry, names_to = "model", values_to = "Tleaf_pred") %>% 
-  rename(Tleaf = observed) %>% 
-  ggplot() +
-  geom_point(aes(x = Tleaf, y = Tleaf_pred, color = model), shape = 1) +
-  theme_classic() +
-  scale_color_manual(
-    values = c("Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("predicted T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank()) + 
-  geom_abline(slope = 1)
-
-out.c %>% 
-  pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
-  pivot_longer(cols = Medlyn:Sperry, names_to = "model", values_to = "Tleaf_pred") %>% 
-  rename(Tleaf = observed) %>% 
-  ggplot() +
-  geom_point(aes(x = Tleaf, y = Tleaf_pred - Tleaf, color = model), alpha = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = c("Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("predicted - observed T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank()) + 
-  geom_hline(yintercept = 0)
+save(control, pred.c, file = "data/out/control_runs.Rdata")
+load("data/out/control_runs.Rdata")
 
 
 # Heatwave data ################################################################
@@ -221,6 +76,7 @@ out.c %>%
 # Subset the model predictions for the ambient treatment  
 heatwave <- subset(WTC4_data,HWtrt=="HW" & PPFD > 500)
 
+## Prescribed E tests ---------------------------------------------------------- 
 pred_prescE.hw = prescribedE_pred(df = filter(heatwave, !is.na(gs)))
 
 diff_long.hw = pred_prescE.hw %>% 
@@ -255,208 +111,106 @@ plot(x = heatwave$Tleaf, y = Tdiff.hw, col = "deeppink")
 points(x = heatwave$Tcan, y = Tleaves.hw - heatwave$Tcan)
 abline(h = 0, col = "blue")
 
-## Fit GAM #####################################################################
+## Fitting ---------------------------------------------------------------------
+
+# Fit GAMs
 gam_E.hw = gam(E ~ s(Tcan), data = heatwave)
 gam_A.hw = gam(A ~ s(Tcan), data = heatwave)
 
+# Get gs model predictions
+pred.hw = get_predictions(df = heatwave, b_USO = 0, g1 = 2.9)
 
-## Fit the Medlyn model ########################################################
-
-Rd = Rd0 * exp(0.1012 * (heatwave$Tcan - TrefR) - 5e-04 * (heatwave$Tcan^2 - TrefR^2))
-# Fit the heatwave treatment (i.e., not the heatwave trees)
-pred1.hw <- PhotosynEB(Tair=heatwave$Tair,VPD=heatwave$VPD,
-                       Wind=8,Wleaf=0.02,StomatalRatio=1,LeafAbs=0.5,
-                       PPFD=heatwave$PPFD,g1=g1,g0=g0,
-                       Vcmax=36.4,EaV=62307,EdVC=2e5,delsC=639,
-                       Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Ca = 420,
-                       Rd0 = 0.92)
-
-get_Pleaves_Medlyn = Vectorize(get_Pleaf_Medlyn, "Ps")
-pred1.hw$P = get_Pleaves_Medlyn(pred1.hw, P50 = P50, P88 = P88, 
-                                  Ps = heatwave$Ps, kmax_25 = 0.5, constant_kmax = TRUE)
-
-table(pred1.hw$failed) # Some energy balance calculations failed
-pred1.hw$Tdiff <- with(pred1.hw,Tleaf-Tair)
-
-## Fit Sperry and Sicangco models ##############################################
-
-# Add kmax values to the data frame
-#heatwave = left_join(heatwave, kmax_df, by = "chamber") #%>% rename(Tair = Tair, PPFD = PPFD)
-#heatwave = heatwave %>% mutate(kmax = 0.7)
-
-heatwave_subset = heatwave %>% 
-  filter(Tleaf >= 33) %>% 
-  mutate(DateTime_rd = floor_date(DateTime_hr, unit = "1 hour")) %>% 
-  group_by(DateTime_rd, chamber, T_treatment, HWtrt, combotrt) %>% 
-  summarise(across(PPFD:Ps, mean)) %>% 
-  ungroup() %>% 
-  rename(DateTime_hr = DateTime_rd)
-
-#test_s = control[1:20,] # Subset of dataset for testing
-
-# Generate predictions
-pred2.hw = make_pred(df = heatwave, 
-                     Tcrit = 43.4, T50 = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50,
-                     Wind = 8, Wleaf = 0.025,
-                     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
-                     kmax_25 = 0.5) # Really slow! Try to optimize
-#pred2.hw = make_pred(df = heatwave, models = "final", Tcrit = 46, T50 = 48) # Really slow! Try to optimize
-
-plot(pred2.hw$Tleaf, pred2.hw$E)
-
-plot(pred2.hw$P[pred2.hw$Model == "Sperry"])
-plot(heatwave$Ps)
-
-# Check if either model predicts negative gs values
-table(pred2$gs[pred2$Model == "Sicangco"] >= 0) # No negative gs
-table(pred2$gs[pred2$Model == "Sperry"] >= 0) # No negative gs
-
-
-### Fit intermediate models, i.e. Sperry with either CGnet or TC ###############
-
-# Generate predictions
-pred3.hw = make_pred(df = heatwave, models = "intermediate", 
-                     Tcrit_hw = 43.4, T50_hw = 49.6, LeafAbs = 0.5, P50 = 4.07, P88 = 5.50) # Really slow! Try to optimize
-# Check if either model predicts negative gs values
-table(pred3.hw$gs[pred3.hw$Model == "Sperry + CGnet"] >= 0) # 158/2341 have negative gs
-table(pred3.hw$gs[pred3.hw$Model == "Sperry + TC"] >= 0) # All predict positive gs
-summary(control$PPFD[which(pred3.hw$gs < 0)]) # Happens for low PPFD (< 52.5)
-
+# Check if any model predicts negative gs values
+sapply(unique(pred.hw$Model), 
+       function(model) table(pred.hw$gs[pred.hw$Model == model] >= 0)) # all predict positive gs
 
 # Save heatwave observations and predictions
-save(heatwave, pred1.hw, pred2.hw, file = "data/out/heatwave_runs_varkmaxpt5_new.Rdata")
-load("data/out/heatwave_runs_varkmaxpt5_fittedTcritT50_JPhydraulics_Wind8_Wleafpt02_DKparams_CGnetorig_5models.Rdata")
+save(heatwave, pred.hw, file = "data/out/heatwave_runs.Rdata")
+load("data/out/heatwave_runs.Rdata")
 
-## Plot results ################################################################ 
+# Plotting #####################################################################
 
-# Plot Tleaf predictions minus observations for all models
-Tdiff.Sic.hw = subset(pred2.hw, Model == "Sicangco")$Tleaf - heatwave$Tcan
-Tdiff.Sp.hw = subset(pred2.hw, Model == "Sperry")$Tleaf - heatwave$Tcan
-Tdiff.Med.hw = pred1.hw$Tleaf - heatwave$Tcan
+## Prep outputs ---------------------
 
-# Plot Tdiff by model
-data.frame(DateTime_hr = heatwave$DateTime_hr, 
-           Tdiff = c(Tdiff.Sic.hw, Tdiff.Sp.hw, Tdiff.Med.hw), 
-           model = rep(c("Sicangco", "Sperry", "Medlyn"), each = nrow(heatwave))) %>% 
-  ggplot(aes(x = Tdiff, color = model)) +
-  geom_density(alpha = 0.2, size = 1) +
-  #geom_histogram(aes(y=..density..), alpha=0.5, 
-  #               position="identity") +
-  theme_classic() +
-  geom_vline(xintercept = 0, linetype = "dashed")
+preds = list(list(control, pred.c), list(heatwave, pred.hw))
+out.l = lapply(preds, function(ls) {
+  #ls[[2]] = ls[[2]] %>% arrange(Model)
+  out = data.frame(#datetime = rep(ls[[1]]$DateTime_hr, times = 6),
+                   datetime = c(ls[[1]]$DateTime_hr, rep(ls[[1]]$DateTime_hr, each = 4), 
+                                ls[[1]]$DateTime_hr),
+                   #chamber = rep(ls[[1]]$chamber, times = 6),
+                   chamber = c(ls[[1]]$chamber, rep(ls[[1]]$chamber, each = 4), 
+                                ls[[1]]$chamber),
+                   Model = c(rep("observed", nrow(ls[[1]])), ls[[2]]$Model),
+                   E = c(ls[[1]]$E, ls[[2]]$E),
+                   A = c(ls[[1]]$A, ls[[2]]$A),
+                   gs = c(ls[[1]]$gs, ls[[2]]$gs),
+                   Dleaf = c(ls[[1]]$Dleaf, ls[[2]]$Dleaf),
+                   Tleaf = c(ls[[1]]$Tcan, ls[[2]]$Tleaf),
+                   Pleaf = c(rep(NA, nrow(ls[[1]])), ls[[2]]$P))
+  
+  out$Model = factor(out$Model, levels = c("observed", "Medlyn", "Sperry", 
+                                               "Sperry + varkmax", "Sperry + CGnet", 
+                                               "Sperry + CGnet + TC"))
+  out = out %>% arrange(Model)
+  return(out)
+  
+})
 
-# Create summary data frame
-out.hw = data.frame(datetime = rep(heatwave$DateTime_hr, times = 6),
-                    chamber = rep(heatwave$chamber, times = 6),
-                    Model = rep(c("observed", "Medlyn", "Sperry", 
-                                  "Sperry + varkmax", "Sperry + CGnet", 
-                                  "Sperry + CGnet + TC"), each = nrow(heatwave)),
-                    E = c(heatwave$E, pred1.hw$ELEAF, pred2.hw$E),
-                    A = c(heatwave$A, pred1.hw$ALEAF, pred2.hw$A),
-                    gs = c(heatwave$gs, pred1.hw$gw, pred2.hw$gs),
-                    Dleaf = c(heatwave$Dleaf, pred1.hw$VPDleaf, pred2.hw$Dleaf),
-                    Tleaf = c(heatwave$Tcan, pred1.hw$Tleaf, pred2.hw$Tleaf),
-                    Pleaf = c(rep(NA, nrow(heatwave)), rep(NA, nrow(heatwave)), pred2.hw$P),
-                    Tair = c(heatwave$Tair, pred1.hw$Tair, pred2.hw$Tair),
-                    VPD = rep(heatwave$VPD, times = 6),
-                    PPFD = rep(heatwave$PPFD, times = 6),
-                    Ps = rep(heatwave$Ps, times = 6)) 
-out.hw$Model = factor(out.hw$Model, levels = c("observed", "Medlyn", "Sperry", "Sperry + varkmax", "Sperry + CGnet", 
-                                               "Sperry + CGnet + TC" 
-                                               ))
+names(out.l) = c("control", "heatwave")
 
-# Plot transpiration versus canopy temperature 
-# E too high for Sperry and Sicangco models, but trend is good
-# Notably this is exaggerated for chambers 7 and 9, which has an "increasing" trend in SWP
-palette = c(Sperry = "#88CCEE", "Sperry + CGnet" = "#332288", "Sperry + CGnet + TC" = "#DDCC77",
-            Medlyn = "#CC6677", observed = "black")
 palette = c(Sperry = "#1E88E5", "Sperry + varkmax" = "#332288", "Sperry + CGnet" = "#e7d87d", "Sperry + CGnet + TC" = "orange", 
             Medlyn = "#D81B60", observed = "grey50")
-EvT.hw = plotGAM(gam_E.hw, smooth.c = "Tcan") +
-  geom_point(data = out.hw, aes(x = Tleaf, y = E, color = Model), shape = 1, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "USO",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)]),
-               expression("ProfitMax"[net]),
-               expression("ProfitMax"[TC])
-    )) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("E"*" (mmol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank())
-EvT.hw
 
-# Plot A versus canopy temperature 
-AvT.hw = plotGAM(gam_A.hw, smooth.c = "Tcan") +
-  geom_point(data = out.hw, aes(x = Tleaf, y = A, color = Model), shape = 1, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "USO",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)]),
-               expression("ProfitMax"[net]),
-               expression("ProfitMax"[TC])
-               )) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("A (" * mu * "mol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") #+
-  #theme(plot.title = element_blank())
-AvT.hw
-  # Combine all plots (i.e. recreate Drake et al. Fig 5 with models)
+## Figure 5: A, E vs Tleaf -------------------------
+
+# Plot A and E versus canopy temperature for the control and heatwave treatments 
+EvT.c = plot_AEvT_WTC(gam_E.c, out.l$control, "E")
+AvT.c = plot_AEvT_WTC(gam_E.c, out.l$control, "A")
+EvT.hw = plot_AEvT_WTC(gam_E.hw, out.l$heatwave, "E")
+AvT.hw = plot_AEvT_WTC(gam_E.c, out.l$heatwave, "A")
+
+# Combine all plots (i.e. recreate Drake et al. Fig 5 with all models)
 AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) + 
                        labs(title = "Control",
-                            subtitle = expression(bold("(a)"))) + theme(axis.title.x = element_blank(), plot.title = element_text(hjust = 0.5)), 
-          AvT.hw + ylim(-2.5, 13) +
-          labs(title = "Heatwave",
-               subtitle = expression(bold("(b)"))) + ggtitle("Heatwave") + theme(axis.title.y = element_blank(), axis.title.x = element_blank(), plot.title = element_text(hjust = 0.5)), 
-          EvT.c + ylim(-1, 4) + ggtitle("(c)") + theme(axis.title.x = element_blank(), plot.title = element_text(face = "bold", hjust = 0, vjust = 5)), 
-          EvT.hw + ylim(-1,4) + ggtitle("(d)") + theme(axis.title.y = element_blank(), axis.title.x = element_blank(), plot.title = element_text(face = "bold", hjust = 0, vjust = 5)),
-          nrow = 2, ncol = 2, common.legend = TRUE, legend = "right")
+                            subtitle = expression(bold("(a)"))) + 
+                       theme(axis.title.x = element_blank(), 
+                             plot.title = element_text(hjust = 0.5)), 
+                     AvT.hw + ylim(-2.5, 13) +
+                       labs(title = "Heatwave",
+                            subtitle = expression(bold("(b)"))) + 
+                       ggtitle("Heatwave") + 
+                       theme(axis.title.y = element_blank(), 
+                             axis.title.x = element_blank(), 
+                             plot.title = element_text(hjust = 0.5)), 
+                     EvT.c + ylim(-1, 4) + ggtitle("(c)") + 
+                       theme(axis.title.x = element_blank(), 
+                             plot.title = element_text(face = "bold", hjust = 0, vjust = 5)), 
+                     EvT.hw + ylim(-1,4) + ggtitle("(d)") + 
+                       theme(axis.title.y = element_blank(), 
+                             axis.title.x = element_blank(), 
+                             plot.title = element_text(face = "bold", hjust = 0, vjust = 5)),
+                     nrow = 2, ncol = 2, common.legend = TRUE, legend = "right")
 AEvT.plt = 
   annotate_figure(AEvT.plt,
-                bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
+                  bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
 
-
-AEvT.plt
 ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7)
 
-# gs vs Tleaf
-ggplot() +
-geom_point(data = out.hw, aes(x = Tleaf, y = gs, color = Model), shape = 1, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "USO",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)]),
-               expression("ProfitMax"[net]),
-               expression("ProfitMax"[TC])
-    )) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  #ylab(expression("E"*" (mmol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank())
+## Figure 6: Tleaf predictions vs observations -------------------------
 
-
-pred2.hw %>% 
-  ggplot(aes(x = Tleaf, y = -P, color = Model)) +
-  geom_point() +
-  theme_classic()
+test_df = bind_rows(out.l, .id = "treatment")
+test = paste(
+  #heatwave$DateTime_hr, heatwave$chamber
+  out.l$heatwave$datetime, out.l$heatwave$chamber, out.l$heatwave$Model
+             )
+n_occur = data.frame(table(test))
+n_occur[n_occur$Freq > 1,]
 
 Tleaf_pred_obs.plt = 
-  bind_rows(out.c, out.hw) %>% 
-  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
+  #out.l$heatwave %>% 
+  bind_rows(out.l, .id = "treatment") %>% 
+  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime, treatment)) %>% 
   pivot_longer(cols = Medlyn:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf_pred") %>% 
   rename(Tleaf = observed) %>% 
   ggplot() +
@@ -485,88 +239,16 @@ Tleaf_pred_obs.plt =
 Tleaf_pred_obs.plt 
 ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11)
 
-out.hw %>% 
-  pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
-  pivot_longer(cols = Medlyn:Sperry, names_to = "model", values_to = "Tleaf_pred") %>% 
-  rename(Tleaf = observed) %>% 
-  ggplot() +
-  geom_point(aes(x = Tleaf, y = Tleaf_pred - Tleaf, color = model), shape = 1) +
-  theme_classic() +
-  scale_color_manual(
-    values = c("Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("predicted - observed T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank()) + 
-  geom_hline(yintercept = 0)
+## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
 
-bind_rows(out.c, out.hw) %>% 
-  #filter(model == "Medlyn") %>% 
-  pivot_wider(names_from = model, values_from = Tleaf, id_cols = c(chamber, datetime)) %>% 
-  #pivot_longer(cols = Medlyn:Sperry, names_to = "model", values_to = "Tleaf_pred") %>% 
-  rename(Tleaf = observed, Tleaf_pred = Medlyn) %>% 
-  ggplot() +
-  geom_point(aes(x = Tleaf, y = Tleaf_pred - Tleaf), alpha = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = c("Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("predicted - observed T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank()) + 
-  geom_hline(yintercept = 0)
-
-
-heatwave %>% 
-  ggplot(aes(x = Tair, y = Tleaf)) +
-  geom_point() +
-  theme_classic()+ 
-  geom_abline(slope = 1)
-
-out.hw %>% 
-  ggplot(aes(x = model, y = Tleaf, fill = model)) +
-  geom_boxplot() +
-  geom_violin() +
-  scale_color_manual(
-    values = c("observed" = "darkgrey", "Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  theme_classic() +
-  geom_hline(yintercept = 46, linetype = "dashed") +
-  annotate("text", y=Tcrit, label="Tcrit", vjust = -0.5)
-
-out.hw %>% 
-  #filter(!(Model %in% c("Medlyn", "observed"))) %>% 
-  ggplot(aes(x = Tleaf, y = gs, color = Model)) +
-  geom_point(shape = 1)+
-  scale_color_manual(values = palette,
-                     labels = c("Observed", "USO",
-                                "ProfitMax",
-                                expression("ProfitMax"[k[max](T)]),
-                                expression("ProfitMax"[net]),
-                                expression("ProfitMax"[TC])
-                     )) +
-  theme_classic() +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  theme(text = element_text(size = 16))
-
-out.hw %>% filter(Model == "Sperry + CGnet" #& Tleaf > 41.5 & Tleaf < 44
-                  ) %>% 
-  ggplot(aes(x = Tair, y = Tleaf, color = Model)) +
-  geom_point(shape = 1)
-summary(filter(out.hw, Model == "Sperry + varkmax")$Pleaf)
-
-Fig7_PleafvT = out.hw %>% 
-  filter(!(Model %in% c("Medlyn", "observed"))) %>% 
+Fig7_PleafvT = 
+  bind_rows(out.l) %>% 
+  filter(!is.na(Pleaf)) %>% 
   ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
   geom_point(shape = 1)+
-  scale_color_manual(values = palette[-c(5,6)],
-                     labels = c("ProfitMax",
+  scale_color_manual(values = palette[-c(6)],
+                     labels = c("USO",
+                                "ProfitMax",
                                 expression("ProfitMax"[k[max](T)]),
                                 expression("ProfitMax"[net]),
                                 expression("ProfitMax"[TC])
@@ -585,6 +267,7 @@ Fig7_PleafvT
 ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
 
 # Calculate TSM and HSM ########################################################
+
 # TSM
 TSM_summary = out.hw %>%
   filter(model != "observed") %>% 
@@ -751,22 +434,3 @@ ggplot() +
   guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
          linetype = "none") +
   theme(plot.title = element_blank())
-
-
-# Testing for A behaviour at high temps ########################################
-test = out.hw %>% filter(Tleaf > 41, model == "Sperry")
-gs_Med = out.hw$gs[out.hw$Tleaf > 41 & out.hw$model == "Medlyn"]
-test_A_Sp = calc_A(Tleaf = test$Tleaf, g_w = test$gs, VPD = test$VPD, net = TRUE, netOrig = TRUE,
-           PPFD = test$PPFD, Wind = 8, 
-           Wleaf = 0.01, LeafAbs = 0.5,
-           Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-           Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)
-test_A_M = calc_A(Tleaf = test$Tleaf, g_w = 0.003, VPD = test$VPD, net = TRUE, netOrig = TRUE,
-                   PPFD = test$PPFD, Wind = 8, 
-                   Wleaf = 0.01, LeafAbs = 0.5,
-                   Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-                   Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633)
-plot(test$A)
-points(test_A_Sp, col = "blue")
-points(test_A_M, col = "deeppink")
-points(out.hw$A[out.hw$Tleaf > 41 & out.hw$model == "Medlyn"], col = "deeppink3")

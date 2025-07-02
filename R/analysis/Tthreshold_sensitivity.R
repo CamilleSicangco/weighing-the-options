@@ -1,81 +1,67 @@
 # Sensitivity analysis of TC model to Tcrit and T50
 # Created 27 May 2025
 
-# Make predictions with different Tcrit/T50 values
-make_pred_Tthresholds = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.5,
-                     hold_Tcrit = FALSE,
-                     Thold_val = 49.6,
-                     Tvar_vals = c(43.4, 45.5, 47.5, 48.5),
-                     ...) {
-  if(isTRUE(hold_Tcrit)) {
-    Tcrit = Thold_val
-    T50s = Tvar_vals
-    
-    sims.l = lapply(T50s, function(x,...) make_pred_fn2(model = "Sperry + CGnet + TC", df = df,
-                               Tcrit = Thold_val, T50 = x,
-                               ...))
-    names(sims.l) = paste0("T50_", Tvar_vals)
-    preds = bind_rows(sims.l, .id = "ID") %>% 
-      mutate(Tcrit = Thold_val,
-             T50 = str_sub(ID, 5)) %>% 
-      select(!ID)
-  } else {
-    T50 = Thold_val
-    Tcrits = Tvar_vals
-    
-    sims.l = lapply(Tcrits, function(x,...) make_pred_fn2(model = "Sperry + CGnet + TC", df = df, 
-                                                              Tcrit = x, T50 = T50,
-                                                              ...))
-    names(sims.l) = paste0("T50_", Tvar_vals)
-    preds = bind_rows(sims.l, .id = "ID") %>% 
-      mutate(T50 = Thold_val,
-             Tcrit = str_sub(ID, 5)) %>% 
-      select(!ID)
-  }
-  
-  return(preds)
-}
-
+# Set environmental variables, with and without constant VPD
 Tair_vec = seq(30,60, by = 1)
-Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = 1500, VPD = 1.5,
+Tair_sim_constVPD.df = data.frame(Tair = Tair_vec, PPFD = 1500, VPD = 1.5,
                          Ps = 0.5)
-#EaV=51780,EdVC=2e5,delsC=640,
-#Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Rd = 0)
-test1 = make_pred_fn2(model = "Sperry + CGnet + TC", df = Tair_sim.df, 
-                     Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
-                     Tcrit = 43.6, T50 = 49.6,
-                     kmax_25 = 0.5, constant_kmax = FALSE)#,Jmax = 100, Vcmax = 50,
-                     #EaV=51780, EaJ=21640, delsC=640, delsJ=633)
-test2 = make_pred_fn2(model = "Sperry + CGnet + TC", df = Tair_sim.df, 
-                     Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
-                     Tcrit = 48.6, T50 = 49.6,
-                     kmax_25 = 0.5, constant_kmax = FALSE#,Jmax = 100, Vcmax = 50
-                     )
-#test1 %>% 
-bind_rows(test1, test2, .id = "test") %>% 
-  ggplot(aes(x = Tair, y = gs, color = test
-             )) + 
-  geom_point(shape = 1) + 
-  theme_classic() +
-  ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
-  xlab(expression("T"[leaf]*" (\u00B0C)"))
 
+VPD = RHtoVPD(RH = 60, TdegC = Tair_vec)
+Tair_sim_constRH.df = data.frame(Tair = Tair_vec, PPFD = 1500, VPD,
+                                  Ps = 0.5)
+# GENERATE PREDICTIONS #########################################################
 
-preds_varTcrit = make_pred_Tthresholds(Tair_sim.df, 
-                              Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
-                              kmax_25 = 0.5, constant_kmax = FALSE)
+# Hold T50 constant, vary Tcrit
+preds_varTcrit_constVPD = make_pred_Tthresholds(Tair_sim_constVPD.df)
+preds_varTcrit_constRH = make_pred_Tthresholds(Tair_sim_constRH.df)
 
-palette = scales::seq_gradient_pal("slategray1","darkslateblue", "Lab")(seq(0,1,length.out=4))
-Tcrit.plt = preds_varTcrit %>% 
-  ggplot(aes(x = Tleaf, y = gs, linetype = Tcrit, color = Tcrit)) + 
-  geom_line(linewidth = 1) + 
-  theme_classic() +
-  ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  guides(linetype = guide_legend(title = expression("T"[crit]*" (\u00B0C)")),
-         color = guide_legend(title = expression("T"[crit]*" (\u00B0C)"))) +
-  scale_colour_manual(values = palette) +
-  theme(axis.title = element_text(size = 14))
-Tcrit.plt
-ggsave("figs/Fig4_SA_Tcrit.tiff", Tcrit.plt, height = 7, width = 11)
+# Hold Tcrit constant, vary T50
+preds_varT50_constVPD = make_pred_Tthresholds(Tair_sim_constVPD.df, 
+                                     hold_Tcrit = TRUE,
+                                     Thold_val = 43.4,
+                                     Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
+preds_varT50_constRH = make_pred_Tthresholds(Tair_sim_constRH.df, 
+                                              hold_Tcrit = TRUE,
+                                              Thold_val = 43.4,
+                                              Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
+
+# List all predictions
+preds.l = list(preds_varTcrit_constRH, preds_varTcrit_constVPD,
+                        preds_varT50_constRH, preds_varT50_constVPD)
+names(preds.l) = c("varTcrit_constRH", "varTcrit_constVPD",
+                   "varT50_constRH", "varT50_constVPD")
+# PLOTTING #####################################################################
+
+# Generate plots
+plts.l = lapply(1:length(preds.l), function(i) {
+  
+  palette = scales::seq_gradient_pal("slategray1","darkslateblue", "Lab")(seq(0,1,length.out=4))
+  
+  # Specify if Tcrit or T50 are varied
+  if (isTRUE(grepl("Tcrit", names(preds.l)[i]))) {
+    plt = preds.l[[i]] %>% 
+      ggplot(aes(x = Tleaf, y = gs, linetype = Tcrit, color = Tcrit))
+    legend_label = expression("T"[crit]*" (\u00B0C)")
+  } else {
+    plt = preds.l[[i]] %>% 
+      ggplot(aes(x = Tleaf, y = gs, linetype = T50, color = T50))
+    legend_label = expression("T"[50]*" (\u00B0C)")
+  }
+  # Create plots
+  plt = plt + 
+    geom_line(linewidth = 1) + 
+    theme_classic() +
+    ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
+    xlab(expression("T"[leaf]*" (\u00B0C)")) +
+    guides(linetype = guide_legend(title = legend_label),
+           color = guide_legend(title = legend_label)) +
+    scale_colour_manual(values = palette) +
+    theme(axis.title = element_text(size = 14))
+})
+names(plts.l) = names(preds.l)
+
+ggsave("figs/Fig4_SA_Tcrit_constRH.tiff", plts.l[[1]], height = 7, width = 11)
+ggsave("figs/SA_Tcrit_constVPD.tiff", plts.l[[2]], height = 7, width = 11)
+ggsave("figs/SA_T50_constRH.tiff", plts.l[[3]], height = 7, width = 11)
+ggsave("figs/SA_T50_constVPD.tiff", plts.l[[4]], height = 7, width = 11)
 

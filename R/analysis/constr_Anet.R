@@ -51,7 +51,7 @@ preds.ProfitMax_net = make_pred_fn2(model = "Sperry + CGnet",
                                          Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
                                          Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, Rd0 = Rd0,
                                          kmax_25 = kmax_25)
-bind_rows(preds.ProfitMax, preds.ProfitMax_constrCi, preds.ProfitMax_net) %>% 
+bind_rows(preds.ProfitMax, preds.ProfitMax_constrCi_varkmax, preds.ProfitMax_net) %>% 
  # filter(Tair > 40 & Tair < 45) %>% 
   ggplot(aes(x = Tair, y = gs, color = Model)) +
   geom_point() +

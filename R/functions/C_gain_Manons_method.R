@@ -4,7 +4,7 @@
 C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
                        VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 2, Wleaf = 0.01, 
                        LeafAbs = 0.5, Ca = 420, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
-                       Rd0 = 0.92, TrefR = 25, ...) 
+                       Rd0 = 0.92, TrefR = 25, net = TRUE, ...) 
 {
   # Calculate transpiration supply stream
   E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
@@ -27,12 +27,21 @@ C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
   
   # Calculate demand A with Farqhuar model
   Tleaves = t(array(Tleaf, dim = c(500, length(E))))
-  A_demand = as.numeric(mapply(Photosyn_custom, VPD = VPD, 
+  Photosyn_out = mapply(Photosyn_custom, VPD = VPD, 
                         Ca = Ca, PPFD = PPFD, Tleaf = Tleaves, 
                         Patm = Patm, 
                         Ci = Cis, Jmax = Jmax, Vcmax = Vcmax,
-                        Rd0 = Rd0, TrefR = TrefR, new_JT = FALSE)[2,])
-  dim(A_demand) = c(500, 500)
+                        Rd0 = Rd0, TrefR = TrefR, new_JT = FALSE,
+                        ...)
+  
+  if (isTRUE(net)) {
+    A_demand = as.numeric(Photosyn_out[2,])
+  } else {
+    Anet = as.numeric(Photosyn_out)[2,]
+    Rd = as.numeric(Photosyn_out)[8,]
+    A_demand = Anet + Rd
+  }
+ dim(A_demand) = c(500, 500)
   
   # Find which values of supply and demand A match closest for each value of E
   idx = apply(abs(A_supply - A_demand), 2, FUN = which.min)
@@ -41,9 +50,7 @@ C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
   Ci = sapply(1:length(E), function(e) {Cis[idx[e], e]})
   A_P = sapply(1:length(E), function(e) {A_demand[idx[e], e]})
   
-  #plot(Ci)
-  #plot(A_P)
-  
+  # Calculate Amax
   Amax = if (is.null(Amax) & !(all(A_P <= 0))) {
     max(abs(A_P))
   } else if (is.null(Amax) & (all(A_P <= 0))) {
@@ -51,6 +58,8 @@ C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
   } else {
     Amax
   }
+  
+  # Normalise A to get CG
   gain = A_P/Amax
   return(gain)
 }

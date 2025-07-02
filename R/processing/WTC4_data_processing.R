@@ -14,7 +14,7 @@ SWC_df$DateTime_hr <- HIEv::nearestTimeStep(SWC_df$DateTime_hr,nminutes=30,"floo
 # Compare temperature measurements #############################################
 
 # Load data
-WTC4_temp_data = read.csv("data/in/raw/WTC_TEMP-PARRA_CM_TEMPERATURES-COMBINED_20161010-20161123_L1.csv")
+WTC4_temp_data = read.csv("http://hie-pub.westernsydney.edu.au/07fcd9ac-e132-11e7-b842-525400daae48/WTC_TEMP-PARRA_HEATWAVE-FLUX-PACKAGE_L1/data/WTC_TEMP-PARRA_CM_TEMPERATURES-COMBINED_20161010-20161123_L1.csv")
 
 # Histogram of thermocouple, radiometer, and air temperatures
 WTC4_temp_data %>% 
@@ -159,7 +159,8 @@ WTC4_data$Ps[WTC4_data$chamber == "C11"] = max(WTC4_data$Ps[WTC4_data$chamber ==
 
 # Write csv of final data frame for analysis
 write.csv(WTC4_data, "data/in/WTC4_data.csv", row.names = FALSE)
-test = read.csv("data/in/WTC4_data.csv")
+WTC4_data = read.csv("data/in/WTC4_data.csv")
+
 # Alternative estimation of Ps from soil water retention curve
 theta_sat = 0.185 # m3 m-3
 bch = 4

@@ -2,9 +2,7 @@
 # by Camille Sicangco
 # 19 June 2025
 
-# TODO Fig S1: ProfitMax with CG via gross or net photosynthesis w/ constrained Ci ####
-
-# Fig S2: Jmax-T response w/ and w/o TC ########################################
+# Fig S1: Jmax-T response w/ and w/o TC ########################################
 Jold = TJmax(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635)
 Jnew = TJmax_updated(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635, Tcrit = 43.4, T50 = 49.6)
 FigS2 = data.frame(Tair = rep(Tair_vec, 2), 
@@ -24,7 +22,7 @@ FigS2 = data.frame(Tair = rep(Tair_vec, 2),
   guides(linetype = guide_legend(title = expression("J"[max])))
 ggsave("figs/FigS2_JvsT.tiff", FigS2, height = 6, width = 10)
 
-# Fig S3: Predawn time series ##################################################
+# Fig S2: Predawn time series ##################################################
 predawn_LWP =  
   predawn_df %>% 
   filter(tissue == "leaf") %>% 
@@ -42,16 +40,13 @@ FigS3 = ggplot(NULL, aes(x = date, y = Ps, color = chamber)) +
   theme(text = element_text(size = 14))
 ggsave("figs/FigS3_Pleaf_timeseries.tiff", FigS3, height = 6, width = 10)
 
+# Fig S3: Theoretical simulations with constant VPD ############################
+
+# See R/analysis/T_range_testing.R
+
 # Fig S4: Cost, gain, and profit functions at Tair = 30 deg C ##################
 
-cost_gain30 = calc_costgain_netorig(P, b, c, kmax_25 = kmax_25, 
-                                    Tair = 30, PPFD = PPFD, VPD = VPD,
-                                    Tcrit = Tcrit, T50 = T50, #constant_kmax = TRUE,
-                                    Wind = 8, Wleaf = 0.02, LeafAbs = 0.5,
-                                    Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                                    Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
-FigS4 = composite_plot(cost_gain30)
-ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", FigS4, width = 12.25, height = 6.5)
+# See R/analysis/inst_sims.R
 
 # Fig S5: Predicted Ci vs Pleaf for Tair = 48 deg C, ProfitMax_net #############
 # Set hydraulic parameters
@@ -97,24 +92,6 @@ ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6)
 
 # Fig S6: T50 sensitivity analysis #############################################
 
-palette = scales::seq_gradient_pal("slategray1","darkslateblue", "Lab")(seq(0,1,length.out=4))
-preds_varT50 = make_pred_Tthresholds(Tair_sim.df, 
-                                     Wind = 8, Wleaf = 0.02, LeafAbs = 0.5, 
-                                     kmax_25 = 0.5, constant_kmax = FALSE,
-                                     hold_Tcrit = TRUE,
-                                     Thold_val = 43.4,
-                                     Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
-
-T50.plt = preds_varT50 %>% 
-  ggplot(aes(x = Tleaf, y = gs, linetype = T50, color = T50)) + 
-  geom_line(linewidth = 1) + 
-  theme_classic() +
-  ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  guides(linetype = guide_legend(title = expression("T"[50]*" (\u00B0C)")),
-         color = guide_legend(title = expression("T"[50]*" (\u00B0C)"))) +
-  scale_colour_manual(values = palette) +
-  theme(axis.title = element_text(size = 14))
-ggsave("figs/FigS6_SA_T50.tiff", T50.plt, height = 7, width = 11)
+# See R/analysis/Tthreshold_sensitivity.R
 
 # TODO Fig S7: kmax sensitivity analysis ############################################

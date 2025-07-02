@@ -14,7 +14,7 @@ prescribedE_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.86, Rd0 = 0.92
   gs = try(calc_gw(E = df$E, Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD, 
                    PPFD = df$PPFD, Wind = Wind, Wleaf = Wleaf))
   Agr =  mapply(plantecophys::Photosyn, VPD = df$VPD, 
-              Ca = 420, PPFD = df$PPFD, Tleaf = df$Tcan,  
+              Ca = 400, PPFD = df$PPFD, Tleaf = df$Tcan,  
               GS = gs,
               Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
               Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Rd0 = 0)
@@ -31,176 +31,108 @@ prescribedE_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.86, Rd0 = 0.92
   return(out)
 }
 
-# Make predictions with Sperry and Sicangco models (or intermediate model versions) 
-# for multiple observations
-make_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.5,
-                     Tcrit = 43.4, T50 = 49.6,...) {
 
-  # Generate Sperry model predictions
-  preds1 = make_pred_fn2(model = "Sperry", df = df, Wind = Wind, Wleaf = Wleaf,
-                         LeafAbs = LeafAbs, Tcrit = Tcrit, T50 = T50,...)
-  
-  # Generate Sperry+ variable kmax model predictions
-  preds2 = make_pred_fn2(model = "Sperry + varkmax", df = df, Wind = Wind, Wleaf = Wleaf,
-                         LeafAbs = LeafAbs, Tcrit = Tcrit, T50 = T50,...) 
-  
-  # Generate Sperry + CGnet model predictions
-  preds3 = make_pred_fn2(model = "Sperry + CGnet", df = df, Wind = Wind, Wleaf = Wleaf,
-                         LeafAbs = LeafAbs, Tcrit = Tcrit, T50 = T50,...)
-
-  # Generate Sperry + CGnet + TC model predictions
-  preds4 = make_pred_fn2(model = "Sperry + CGnet + TC", df = df, Wind = Wind, Wleaf = Wleaf,
-                         LeafAbs = LeafAbs, Tcrit = Tcrit, T50 = T50,...)
-  
-  preds = bind_rows(preds1, preds2, preds3, preds4)
-  return(preds)
-}
-
-# Generate predictions for multiple observations for one model
-make_pred_fn2 = function(
-    model = c("Sperry", "Sperry + varkmax", "Sperry + CGnet", "Sperry + CGnet + TC"),
-    df, 
+# Generate predictions for all models
+make_pred = function(
+    Tair, Ps, VPD, PPFD, 
+    P50 = 4.07, P88 = 5.5,
     Wind = 8,
-    Wleaf = 0.01,
-    LeafAbs=0.86,
-    Tcrit = 44.4,
-    T50 = 50.4,
-    kmax_25 = 0.7,
+    Wleaf = 0.025,
+    LeafAbs=0.5,
+    Tcrit = 43.4,
+    T50 = 59.6,
+    kmax_25 = 0.5,
+    Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
+    Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
+    Rd0 = 0.92,
+    constr_Ci = FALSE,
     ...) {
+  
+  # Hydraulics
+  Weibull = fit_Weibull(P50, P88)
+  b = Weibull[1,1]
+  c = Weibull[1,2]
+  Pcrit = calc_Pcrit(b, c)
+  P = Ps_to_Pcrit(Ps, Pcrit)
+  
+  
+  # Calculate costs and gains
+  cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
+                            PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                            Tcrit = Tcrit, T50 = T50, 
+                            Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                            Rd0 = Rd0, constr_Ci = constr_Ci, ...)
+
+  models = c("Sperry", "Sperry + varkmax", "Sperry + CGnet", "Sperry + CGnet + TC")
+
+  
   # Generate model predictions
-  preds = mapply(make_pred_fn, Tair = df$Tair, Ps = df$Ps, VPD = df$VPD,
-                 PPFD = df$PPFD, kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-                 model = model, 
-                 Tcrit = Tcrit, 
-                 T50 = T50,
-                 ...)
+  preds = sapply(models, 
+                 function(x) make_pred_fn(model = x, 
+                                          cost_gain = cost_gain, 
+                                          P = P, b = b, c = c,
+                                          Tair = Tair, Ps = Ps, VPD = VPD, 
+                                          PPFD = PPFD, kmax_25 = kmax_25, 
+                                          Wind = Wind, Wleaf = Wleaf, 
+                                          LeafAbs = LeafAbs,
+                                          Tcrit = Tcrit, T50 = T50,
+                                          ...)
+  )
   preds = data.frame(t(preds))
-  names(preds) = c("Model", "Tair", "Ps", "P", "E", "Tleaf", "Dleaf", "gs", "A")
+  rownames(preds) = NULL
   preds = preds %>% mutate(across(Tair:A, as.numeric))
   return(preds)
 }
 
 # Make predictions with Sperry or Sicangco models for a single observation
-make_pred_fn = function(Tair, 
-                        Ps, 
-                        VPD, 
-                        PPFD, 
-                        Wind, 
-                        LeafAbs = 0.5,
-                        Wleaf = 0.025,
-                        Tcrit = 48.574,
-                        T50 = 50.17,
-                        P50 = 4.07,
-                        P88 = 5.50,
-                        kmax_25 = 2,
-                        Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                        Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
-                        Rd0 = 0.92,
-                        model,
-                        Sperry_net_constrCi = FALSE,
-                        #constant_kmax = TRUE,
-                        ...) {
+make_pred_fn = function(P, b, c,
+                         cost_gain,
+                         Tair, 
+                         Ps, 
+                         VPD, 
+                         PPFD, 
+                         Wind, 
+                         LeafAbs = 0.5,
+                         Wleaf = 0.025,
+                         Tcrit = 43.4,
+                         T50 = 49.6,
+                         P50 = 4.07,
+                         P88 = 5.50,
+                         kmax_25 = 0.5,
+                         Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
+                         Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
+                         Rd0 = 0.92,
+                         model,
+                         constr_Ci = FALSE,
+                         #constant_kmax = TRUE,
+                         ...) {
   
   
-    # Hydraulics
-    Weibull = fit_Weibull(P50, P88)
-    b = Weibull[1,1]
-    c = Weibull[1,2]
-    Pcrit = calc_Pcrit(b, c)
-    P = Ps_to_Pcrit(Ps, Pcrit)
-    E_vec_varkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
-    E_vec_constkmax = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
-    
-    # Solve optimization
-    if (model == "Sperry") {
-      HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
-      CG_gross = C_gain_corr(P, b, c, kmax_25 = kmax_25,
-                             Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-                             Tair = Tair, PPFD = PPFD, 
-                             VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-                             Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-                             Rd0 = Rd0,
-                             constant_kmax = TRUE, net = FALSE, new_JT = FALSE, 
-                              ...)
-      
-      i = which.max(CG_gross - HC_constkmax)
-    } else if (model == "Sperry + varkmax") {
-      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
-      CG_gross_varkmax = C_gain_corr(
-        P, b, c, kmax_25 = kmax_25,
-        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-        Tair = Tair, PPFD = PPFD, 
-        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-        constant_kmax = FALSE, net = FALSE, new_JT = FALSE, 
-        ...)
-      
-      i = which.max(CG_gross_varkmax - HC_varkmax)
-    } else if (model == "Sperry + CGnet + TC") {
-      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
-      TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
-                        Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
-      CG_net_newJT = C_gain_corr(
-        P, b, c, kmax_25 = kmax_25,
-        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-        Tair = Tair, PPFD = PPFD, 
-        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-        constant_kmax = FALSE, net = TRUE, new_JT = TRUE, netOrig = TRUE, 
-         ...)
-      
-      i = which.max(CG_net_newJT - (HC_varkmax + TC))
-    } else if (model == "Sperry + CGnet") {
-      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
-      CG_net = C_gain_corr(
-        P, b, c, kmax_25 = kmax_25,
-        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-        Tair = Tair, PPFD = PPFD, 
-        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-        constant_kmax = FALSE, net = TRUE, netOrig = TRUE, new_JT = FALSE,  
-        ...)
-      
-      i = which.max(CG_net - HC_varkmax)
-    } else if (model == "Sperry + TC") {
-      HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
-      TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
-                        Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
-      CG_gross_varkmax = C_gain_corr(
-        P, b, c, kmax_25 = kmax_25,
-        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-        Tair = Tair, PPFD = PPFD, 
-        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-        constant_kmax = FALSE, net = FALSE, new_JT = FALSE,  
-        ...)
-      
-      i = which.max(CG_gross_varkmax - (HC_varkmax + TC))
-    } else if (model == "Sperry + CGnet_constrCi") {
-      HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
-      CG_constrCi = C_gain_alt(
-        P, b, c, Amax = NULL, kmax_25 = kmax_25,
-        Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
-        Tair = Tair, PPFD = PPFD, 
-        VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-        Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-        Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
-        constant_kmax = FALSE, new_JT = FALSE)
-      
-      i = which.max(CG_constrCi - HC_constkmax)
-    } else {
-      stop()
-    }
+  # Solve optimization
+  if (model == "Sperry") {
+    i = which.max(cost_gain$CG_gross_constkmax - cost_gain$HC_constkmax)
+  } else if (model == "Sperry + varkmax") {
+    i = which.max(cost_gain$CG_gross_varkmax - cost_gain$HC_varkmax)
+  } else if (model == "Sperry + CGnet") {
+    i = which.max(cost_gain$CG_net - cost_gain$HC_varkmax)
+  } else if (model == "Sperry + CGnet + TC") {
+    i = which.max(cost_gain$CG_net_newJT - (cost_gain$HC_varkmax + cost_gain$TC))
+  } else if (model == "Sperry + TC") {
+    i = which.max(cost_gain$CG_gross_varkmax - (cost_gain$HC_varkmax + cost_gain$TC))
+  } else {
+    stop()
+  }
+  
+  # Hydraulics
+  Weibull = fit_Weibull(P50, P88)
+  b = Weibull[1,1]
+  c = Weibull[1,2]
     
     E_vec = if (model %in% c("Sperry", "Sperry + CGnet_constrCi")) {
-      E_vec_constkmax
+      trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
     } else {
-      E_vec_varkmax
+      trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = FALSE)
     }
     
     P = P[i]
@@ -208,32 +140,26 @@ make_pred_fn = function(Tair,
     Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
                        Wleaf = Wleaf, LeafAbs = LeafAbs)
     Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
-    #gs = calc_gw(E = E, D_leaf = Dleaf)
     gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
                  PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
     
-    #net = if (model == "Sperry") {
-    #  FALSE
-    #} else if (model == "Sicangco") {
-    #  TRUE
-    #} 
     new_JT = if (model %in% c("Sperry + TC", "Sperry + CGnet + TC")) {
       TRUE
     } else {
       FALSE
     }
     
-    A = calc_A_corr(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
-                    PPFD = PPFD, Wind = Wind, 
-                    Wleaf = Wleaf, LeafAbs = LeafAbs,
-                    Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
-                    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT)
+    A = calc_A(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
+               PPFD = PPFD, Wind = Wind, 
+               Wleaf = Wleaf, LeafAbs = LeafAbs,
+               Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+               Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT,
+               ...)
     
     out = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A)
-  
-  
-  names(out) = c("model", "Tair", "Ps", "Pleaf", "E", "Tleaf", "Dleaf", "gs", "A")
-  return(out)
+    
+    names(out) = c("Model", "Tair", "Ps", "P", "E", "Tleaf", "Dleaf", "gs", "A")
+    return(out)
 }
 
 # Calculate Pleaf for the Medlyn model
@@ -251,30 +177,6 @@ calc_Pleaf0 = function(E, Ps, P50 = 4.07, P88 = 5.50) {
   Pleaf = P[i]
   
   return(Pleaf)
-}
-calc_Pleaf = Vectorize(calc_Pleaf0, vectorize.args = c("E", "Ps"))
-
-
-
-# Calculate all marginal gains and costs
-marginal_gaincost = function(df)
-{
-  df = df %>% pivot_wider(names_from = ID, values_from = cost_gain) %>% 
-    mutate(CC = HC + TC)
-  HC = marginal_GainCost(df$P, df$HC)
-  CC = marginal_GainCost(df$P, df$CC)
-  CG_gross = marginal_GainCost(df$P, df$CG_gross)
-  CG_net = marginal_GainCost(df$P, df$CG_net)
-  
-  df_out = data.frame(P = df$P[-1], CG_gross, CG_net, HC, CC)
-  return(df_out)
-}
-
-# Calculate marginal cost or gain 
-marginal_GainCost = function(x = P, y)
-{
-  dy_dx = diff(y) / diff(x)
-  return(dy_dx)
 }
 
 # Custom version of Photosyn function using Heskel et al. 2017 equation for R(T)
@@ -327,7 +229,11 @@ Photosyn_custom <- function(VPD=1.5,
                      Tcrit = 43.4,
                      T50 = 49.6,
                      
-                     new_JT = TRUE){
+                     new_JT = TRUE,
+                     
+                     b_USO = 0.97, # sensitivity of g1 to SWP
+                     Ps = 0.5 # soil water potential, -MPa
+                     ){
   
   
   whichA <- match.arg(whichA)
@@ -395,6 +301,9 @@ Photosyn_custom <- function(VPD=1.5,
   if(gsmodel == "BBOpti"){
     vpduse <- VPD
     vpduse[vpduse < vpdmin] <- vpdmin
+    
+    g1 = g1 * exp(b_USO * (-Ps + 0.2))
+    
     GSDIVA <- (1 + g1/(vpduse^(1-gk)))/Ca
   }
   
@@ -636,407 +545,6 @@ Photosyn_custom <- function(VPD=1.5,
   return(df)
 }
 
-# Custom version of Photosyn function using Heskel et al. 2017 equation for R(T)
-Photosyn_custom_oldTresp <- function(VPD=1.5, 
-                            Ca=400, 
-                            PPFD=1500,
-                            Tleaf=25,
-                            Patm=100,
-                            RH=NULL,
-                            
-                            gsmodel=c("BBOpti","BBLeuning","BallBerry","BBdefine"),
-                            g1=4,
-                            g0=0, 
-                            gk=0.5,
-                            vpdmin=0.5,
-                            D0=5,
-                            GS=NULL,
-                            BBmult=NULL,
-                            
-                            alpha=0.24, 
-                            theta=0.85, 
-                            Jmax=100, 
-                            Vcmax=50, 
-                            gmeso=NULL,
-                            TPU=1000,
-                            alphag=0,
-                            
-                            Rd0 = 1.115,
-                            Q10 = 1.92,
-                            Rd=NULL,
-                            TrefR = 25,
-                            Rdayfrac = 1.0,
-                            
-                            EaV = 58550,
-                            EdVC = 200000,
-                            delsC = 629.26,
-                            
-                            EaJ = 29680,
-                            EdVJ = 200000,
-                            delsJ = 631.88,
-                            
-                            GammaStar = NULL,
-                            Km = NULL,
-                            
-                            Ci = NULL,
-                            Tcorrect=TRUE,  
-                            returnParsOnly=FALSE,
-                            whichA=c("Ah","Amin","Ac","Aj"),
-                            
-                            Tcrit = 43.4,
-                            T50 = 48.6){
-  
-  
-  whichA <- match.arg(whichA)
-  gsmodel <- match.arg(gsmodel)
-  if(gsmodel == "BBdefine" && is.null(BBmult)){
-    Stop("When defining your own BB multiplier, set BBmult.")
-  }
-  inputCi <- !is.null(Ci)
-  inputGS <- !is.null(GS)
-  
-  if(inputCi & inputGS)Stop("Cannot provide both Ci and GS.")
-  
-  if(is.null(TPU))TPU <- 1000
-  
-  if(is.null(VPD) && !is.null(RH)){
-    VPD <- RHtoVPD(RH, Tleaf)
-  } 
-  if(is.null(VPD) && is.null(RH)){
-    Stop("Need one of VPD, RH.")
-  }
-  
-  #---- Constants; hard-wired parameters.
-  Rgas <- .Rgas()
-  GCtoGW <- 1.57     # conversion from conductance to CO2 to H2O
-  
-  
-  #---- Do all calculations that can be vectorized
-  
-  # g1 and g0 are input ALWAYS IN UNITS OF H20
-  # G0 must be converted to CO2 (but not G1, see below)
-  g0 <- g0/GCtoGW
-  
-  # Leaf respiration
-  if(is.null(Rd)){
-    Rd = Rd0 * exp(0.1178 * (Tleaf - TrefR) - 7.017e-4 * (Tleaf^2 - TrefR^2))
-  }
-  
-  # CO2 compensation point in absence of photorespiration
-  if(is.null(GammaStar))GammaStar <- TGammaStar(Tleaf,Patm)
-  
-  # Michaelis-Menten coefficient
-  if(is.null(Km))Km <- TKm(Tleaf,Patm)
-  
-  #-- Vcmax, Jmax T responses
-  if(Tcorrect){
-    Vcmax <- #ifelse(Rd != 0,
-              #      Vcmax * TVcmax_updated(Tleaf,EaV, delsC, EdVC, Tcrit),
-                    Vcmax * TVcmax(Tleaf,EaV, delsC, EdVC)
-    #)
-    Jmax <- #ifelse(Rd != 0,
-             #      Jmax * TJmax_updated(Tleaf, EaJ, delsJ, EdVJ, Tcrit),
-                   Jmax * TJmax(Tleaf, EaJ, delsJ, EdVJ)
-    #)
-  }
-  
-  # Electron transport rate
-  J <- Jfun(PPFD, alpha, Jmax, theta)
-  VJ <- J/4
-  
-  #--- Stop here if only the parameters are required
-  if(returnParsOnly){
-    return(list(Vcmax=Vcmax, Jmax=Jmax, Km=Km, GammaStar=GammaStar, VJ=VJ))
-  }
-  
-  # Medlyn et al. 2011 model gs/A. NOTE: 1.6 not here because we need GCO2!
-  if(gsmodel == "BBOpti"){
-    vpduse <- VPD
-    vpduse[vpduse < vpdmin] <- vpdmin
-    GSDIVA <- (1 + g1/(vpduse^(1-gk)))/Ca
-  }
-  
-  # Leuning 1995 model, without gamma (CO2 compensation point)
-  if(gsmodel == "BBLeuning"){
-    GSDIVA <- g1 / Ca / (1 + VPD/D0)
-    GSDIVA <- GSDIVA / GCtoGW   # convert to conductance to CO2
-  }
-  
-  # Original Ball&Berry 1987 model.
-  if(gsmodel == "BallBerry"){
-    if(is.null(RH))RH <- VPDtoRH(VPD, Tleaf)
-    RH <- RH / 100
-    GSDIVA <- g1 * RH / Ca
-    GSDIVA <- GSDIVA / GCtoGW   # convert to conductance to CO2
-  } 
-  
-  # Multiplier is user-defined.
-  if(gsmodel == "BBdefine"){
-    GSDIVA <- BBmult / GCtoGW
-  }
-  
-  if(inputGS){
-    
-    GC <- GS / GCtoGW
-    
-    if(GS > 0){
-      
-      # Solution when Rubisco activity is limiting
-      A <- 1./GC
-      B <- (Rd - Vcmax)/GC - Ca - Km
-      C <- Vcmax * (Ca - GammaStar) - Rd * (Ca + Km)
-      Ac <- QUADM(A,B,C)
-      
-      # Photosynthesis when electron transport is limiting
-      B <- (Rd - VJ)/GC - Ca - 2*GammaStar
-      C <- VJ * (Ca - GammaStar) - Rd * (Ca + 2*GammaStar)
-      Aj <- QUADM(A,B,C)
-      
-      # NOTE: the solution above gives net photosynthesis, add Rd
-      # to get gross rates (to be consistent with other solutions).
-      Ac <- Ac + Rd
-      Aj <- Aj + Rd
-    } else {
-      Ac <- Aj <- 0
-    }
-    
-  } else {
-    
-    # If CI not provided, calculate from intersection between supply and demand
-    if(!inputCi){
-      
-      #--- non-vectorized workhorse
-      getCI <- function(VJ,GSDIVA,PPFD,VPD,Ca,Tleaf,vpdmin,g0,Rd,
-                        Vcmax,Jmax,Km,GammaStar){
-        
-        if(identical(PPFD, 0) | identical(VJ, 0)){
-          vec <- c(Ca,Ca)
-          return(vec)
-        }
-        
-        # Taken from MAESTRA.
-        # Following calculations are used for both BB & BBL models.
-        # Solution when Rubisco activity is limiting
-        A <- g0 + GSDIVA * (Vcmax - Rd)
-        B <- (1. - Ca*GSDIVA) * (Vcmax - Rd) + g0 * 
-          (Km - Ca)- GSDIVA * (Vcmax*GammaStar + Km*Rd)
-        C <- -(1. - Ca*GSDIVA) * (Vcmax*GammaStar + Km*Rd) - g0*Km*Ca
-        
-        CIC <- QUADP(A,B,C)
-        
-        # Solution when electron transport rate is limiting
-        A <- g0 + GSDIVA * (VJ - Rd)
-        B <- (1 - Ca*GSDIVA) * (VJ - Rd) + g0 * (2.*GammaStar - Ca)- 
-          GSDIVA * (VJ*GammaStar + 2.*GammaStar*Rd)
-        C <- -(1 - Ca*GSDIVA) * GammaStar * (VJ + 2*Rd) - 
-          g0*2*GammaStar*Ca
-        
-        CIJ <- QUADP(A,B,C)
-        return(c(CIJ,CIC))
-      }
-      
-      # get Ci
-      x <- mapply(getCI, 
-                  VJ=VJ,
-                  GSDIVA = GSDIVA,
-                  PPFD=PPFD,
-                  VPD=VPD,
-                  Ca=Ca,
-                  Tleaf=Tleaf,
-                  vpdmin=vpdmin,
-                  g0=g0,
-                  Rd=Rd,
-                  Vcmax=Vcmax,
-                  Jmax=Jmax,
-                  Km=Km,
-                  GammaStar=GammaStar)
-      
-      CIJ <- x[1,]
-      CIC <- x[2,]
-    } else {
-      
-      # Rare case where one Ci is provided, and multiple Tleaf (Jena bug).
-      if(length(Ci) == 1){
-        Ci <- rep(Ci, length(Km))
-      }
-      
-      # Ci provided (A-Ci function mode)
-      CIJ <- Ci
-      
-      if(length(GammaStar) > 1){
-        CIJ[CIJ <= GammaStar] <- GammaStar[CIJ < GammaStar]
-      } else {
-        CIJ[CIJ <= GammaStar] <- GammaStar
-      }
-      
-      CIC <- Ci
-      
-    }
-    
-    # Photosynthetic rates, without or with mesophyll limitation
-    if(is.null(gmeso) || gmeso < 0){
-      # Get photosynthetic rate  
-      Ac <- Vcmax*(CIC - GammaStar)/(CIC + Km)
-      Aj <- VJ * (CIJ - GammaStar)/(CIJ + 2*GammaStar)
-      
-    } else {
-      # Ethier and Livingston (2004) (Equation 10).
-      A <- -1/gmeso
-      BC <- (Vcmax - Rd)/gmeso + CIC + Km
-      CC <- Rd*(CIC+Km)-Vcmax*(CIC-GammaStar)
-      Ac <- mapply(QUADP, A=A,B=BC,C=CC)
-      
-      BJ <- (VJ - Rd)/gmeso + CIC + 2.0*GammaStar
-      CJ <- Rd*(CIC+2.0*GammaStar) - VJ*(CIC - GammaStar)
-      Aj <- mapply(QUADP, A=A,B=BJ,C=CJ)
-      
-      Ac <- Ac + Rd
-      Aj <- Aj + Rd
-      
-    }
-    
-    
-    # When below light-compensation points, assume Ci=Ca.
-    #if(!inputCi){
-     # lesslcp <- vector("logical", length(Aj))
-      #lesslcp <- Aj <= Rd + 1E-09
-      
-      #if(length(Ca) == 1)Ca <- rep(Ca, length(CIJ))
-      #if(length(GammaStar) == 1)GammaStar <- rep(GammaStar, length(CIJ))
-      #if(length(VJ) == 1)VJ <- rep(VJ, length(CIJ))
-      
-      #CIJ[lesslcp] <- Ca[lesslcp]
-      #Aj[lesslcp] <- VJ[lesslcp] * (CIJ[lesslcp] - GammaStar[lesslcp]) / 
-       # (CIJ[lesslcp] + 2*GammaStar[lesslcp])
-      
-      #Ci <- ifelse(Aj < Ac, CIJ, CIC)
-      
-  #  }
-  }
-  
-  # Limitation by triose-phosphate utilization
-  if(!is.null(Ci)){
-    Ap <- 3 * TPU * (Ci - GammaStar)/(Ci - (1 + 3*alphag)*GammaStar)
-    Ap[Ci < 400] <- 1000  # avoid nonsense
-  } else {
-    Ap <- 1000  # This is when inputGS = TRUE; 
-  }  
-  
-  
-  # Hyperbolic minimum.
-  Am <- -mapply(QUADP, A = 1 - 1E-04, B = Ac+Aj, C = Ac*Aj)
-  
-  # Another hyperbolic minimum with the transition to TPU
-  tpulim <- any(Ap < Am)
-  if(!is.na(tpulim) && tpulim){
-    Am <- -mapply(QUADP, A = 1 - 1E-07, B = Am+Ap, C = Am*Ap)
-  }
-  
-  # Net photosynthesis
-  Am <- Am - Rd
-  
-  # Calculate conductance to CO2
-  if(!inputCi && !inputGS){
-    if(whichA == "Ah")GS <- g0 + GSDIVA*Am
-    if(whichA == "Aj")GS <- g0 + GSDIVA*(Aj-Rd)
-    if(whichA == "Ac")GS <- g0 + GSDIVA*(Ac-Rd)
-  } 
-  if(inputCi) {
-    if(whichA == "Ah")GS <- Am/(Ca - Ci)
-    if(whichA == "Aj")GS <- (Aj-Rd)/(Ca - Ci)
-    if(whichA == "Ac")GS <- (Ac-Rd)/(Ca - Ci)
-  }
-  
-  # Extra step here; GS can be negative
-  GS[GS < g0] <- g0
-  
-  # Output conductance to H2O
-  if(!inputGS){
-    GS <- GS*GCtoGW
-  }
-  
-  # Calculate Ci if GS was provided as input.
-  if(inputGS){
-    Ci <- Ca - Am/GC
-    
-    # For zero GC:
-    Ci[!is.finite(Ci)] <- Ca
-    # Stomata fully shut; Ci is not really Ca but that's 
-    # how we like to think about it.
-  }
-  
-  # Chloroplastic CO2 concentration
-  if(!is.null(gmeso)){
-    Cc <- Ci - Am/gmeso
-  } else {
-    Cc <- Ci
-  }
-  
-  # Transpiration rate assuming perfect coupling.
-  # Output units are mmol m-2 s-1
-  E <- 1000*GS*VPD/Patm
-  
-  df <- data.frame( Ci=Ci,
-                    ALEAF=Am,
-                    GS=GS,
-                    ELEAF=E,
-                    Ac=Ac,
-                    Aj=Aj,
-                    Ap=Ap,
-                    Rd=Rd,
-                    VPD=VPD,
-                    Tleaf=Tleaf,
-                    Ca=Ca,
-                    Cc=Cc,
-                    PPFD=PPFD,
-                    Patm=Patm)
-  
-  return(df)
-}
-
-# Modified cost gain function
-calc_costgain_netorig = function (P = NULL, b = -2.5, c = 2, Amax_gross = NULL, Amax_net = NULL, 
-          kmax_25 = 4, Tair = 25, VPD = 1.5, ratiocrit = 0.05, PPFD = 1000, 
-          Patm = 101.325, Wind = 2, Wleaf = 0.01, LeafAbs = 0.5, Tcrit = 50, 
-          T50 = 51, Ca = 420, Jmax = 100, Vcmax = 50, #constant_kmax = FALSE, 
-          Rd0 = 1.115, TrefR = 25, ...) 
-{
-  if(is.null(P)) {
-    return(NULL)
-  }
-  HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, ratiocrit, constant_kmax = TRUE)
-  HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, ratiocrit, constant_kmax = FALSE)
-  TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
-                    Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
-  CG_net_newJT = C_gain_corr(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
-                  Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = FALSE, 
-                  net = TRUE, Rd0, TrefR, netOrig = TRUE, Tcrit = Tcrit, T50 = T50,
-                  new_JT = TRUE, ...)
-  CG_net = C_gain_corr(P, b, c, Amax_net, kmax_25, Tair, VPD, PPFD, 
-                       Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = FALSE, 
-                       net = TRUE, Rd0, TrefR, netOrig = TRUE, Tcrit = Tcrit, T50 = T50,
-                       new_JT = FALSE, ...)
-  CG_gross = C_gain_corr(P, b, c, Amax_gross, kmax_25, Tair, VPD, 
-                    PPFD, Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = TRUE, 
-                    net = FALSE, Rd0, TrefR, Tcrit = Tcrit, T50 = T50,
-                    new_JT = FALSE, ...)
-  CG_gross_varkmax = C_gain_corr(P, b, c, Amax_gross, kmax_25, Tair, VPD, 
-                         PPFD, Patm, Wind, Wleaf, LeafAbs, Ca, Jmax, Vcmax, constant_kmax = FALSE, 
-                         net = FALSE, Rd0, TrefR, Tcrit = Tcrit, T50 = T50,
-                         new_JT = FALSE, ...)
-
-    cost_gain = c(HC_constkmax, HC_varkmax, TC, CG_net, CG_net_newJT, CG_gross, CG_gross_varkmax)
-  ID = c(rep("HC_constkmax", length(HC_constkmax)),
-         rep("HC_varkmax", length(HC_varkmax)),
-         rep("TC", length(TC)), 
-         rep("CG_net", length(CG_net)),
-         rep("CG_net_newJT", length(CG_net_newJT)),
-         rep("CG_gross", length(CG_gross)),
-         rep("CG_gross_varkmax", length(CG_gross_varkmax)))
-         #rep("RC", length(RC)))
-  df = data.frame(P, ID, cost_gain)
-  return(df)
-}
 
 # Function to fit temperature response of Vcmax 
 # by Dushan Kumarathunge
@@ -1184,113 +692,45 @@ fVc.a<-as.formula(Vcmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))
 
 fVJ.a<-as.formula(Jmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))
 
-# Updated V, J T-responses
-TVcmax_updated <- function(Tleaf, EaV, delsC, EdVC, Tcrit = 43.4){
-  
-  if(EdVC > 0){
-    V1 <- 1+exp((delsC*(25 + 273.15)-EdVC)/(.Rgas()*(25 + 273.15)))
-    V2 <- 1+exp((delsC*(Tleaf+273.15)-EdVC)/(.Rgas()*(Tk(Tleaf))))
-    f <- V1/V2
-  } else f <- 1
-  
-  V = ifelse(Tleaf < Tcrit, 
-             exp((Tleaf-25)*EaV/(.Rgas()*Tk(Tleaf)*Tk(25))) * f,
-             0)
-  return(V)
-}
-
-TJmax_updated <- function(Tleaf, EaJ, delsJ, EdVJ, Tcrit = 43.4, T50 = 49.6){
-  J1 <- 1+exp((298.15*delsJ-EdVJ)/.Rgas()/298.15)
-  J2 <- 1+exp((Tk(Tleaf)*delsJ-EdVJ)/.Rgas()/Tk(Tleaf))
-  
-  r = 2/(T50 - Tcrit)
-  functionality = 1 - 1/(1 + exp(-r * (Tleaf - T50)))
-  
-  J = functionality * (exp(EaJ/.Rgas()*(1/298.15 - 1/Tk(Tleaf)))*J1/J2)
-  
-  return(J)
-}
-
-# Original V, J T-responses
-# Vcmax temperature response (Arrhenius)
-TVcmax <- function(Tleaf, EaV, delsC, EdVC){
-  if(EdVC > 0){
-    V1 <- 1+exp((delsC*(25 + 273.15)-EdVC)/(.Rgas()*(25 + 273.15)))
-    V2 <- 1+exp((delsC*(Tleaf+273.15)-EdVC)/(.Rgas()*(Tk(Tleaf))))
-    f <- V1/V2
-  } else f <- 1
-  
-  exp((Tleaf-25)*EaV/(.Rgas()*Tk(Tleaf)*Tk(25))) * f
-}
-
-# Jmax temperature response (Arrhenius)
-TJmax <- function(Tleaf, EaJ, delsJ, EdVJ){
-  J1 <- 1+exp((298.15*delsJ-EdVJ)/.Rgas()/298.15)
-  J2 <- 1+exp((Tk(Tleaf)*delsJ-EdVJ)/.Rgas()/Tk(Tleaf))
-  exp(EaJ/.Rgas()*(1/298.15 - 1/Tk(Tleaf)))*J1/J2
-}
-
-# Correction to C_gain
-C_gain_corr = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
-                        VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 2, Wleaf = 0.01, 
-                        LeafAbs = 0.5, Ca = 420, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
-                        net = FALSE, Rd0 = 0.92, TrefR = 25, netOrig = TRUE, ...) 
-{
-  E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
-  A = calc_A_corr(Tair, VPD, PPFD, Patm, E, Wind, Wleaf, LeafAbs, 
-             Ca, Jmax, Vcmax, net, Rd0, TrefR, netOrig, ...)
-  E = ifelse(E == 0, NA, E)
-  A = ifelse(E == 0, NA, A)
-  Amax = if (is.null(Amax)) {
-    max(abs(A[!is.na(A)]))
-  } else {
-    Amax
-  }
-  
-  gain = 
-    if (!is.na(Amax) & Amax != 0) {
-      A/Amax
-    } else {
-      rep(0, length = length(A))
-    }
-  return(gain)
-}
-
-.Rgas <- function()8.314
-Tk <- function(x)x+273.15
-
-get_preds_theoretical_sims = 
+# Generate predictions with all models
+get_predictions = 
   function(
     df, Tcrit = 43.4, T50 = 49.6, P50 = 4.07, P88 = 5.50,
     Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
-    kmax_25 = kmax_25, #net = TRUE, netOrig = TRUE,
-    g1 = 2.9,g0=0.003,
+    kmax_25 = 0.5, #net = TRUE, netOrig = TRUE,
+    g1 = 2.4,g0=1.e-5, b_USO = 0.97,
+    constr_Ci = FALSE,
     ...
   ) {
-    out = make_pred(df = df, 
-                    Tcrit = Tcrit, T50 = T50, P50 = P50, P88 = P88,
-                    Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
-                    Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC, 
-                    Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, 
-                    Rd0 = Rd0, kmax_25 = kmax_25,
-                    #constant_kmax = constant_kmax, 
-                    #net = net, netOrig = netOrig,
-                    ...) 
+    out = bind_rows(lapply(1:nrow(df), 
+                 function(i) make_pred(
+                   Tair = df$Tair[i], Ps = df$Ps[i], VPD = df$VPD[i], PPFD = df$PPFD[i],
+                   Tcrit = Tcrit, T50 = T50, P50 = P50, P88 = P88,
+                   Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                   Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC, 
+                   Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, 
+                   Rd0 = Rd0, kmax_25 = kmax_25, constr_Ci = constr_Ci,
+                   ...)))
     
     # Make Medlyn predictions
     Medlyn_preds = plantecophys::PhotosynEB(Tair=df$Tair, VPD=df$VPD, PPFD = df$PPFD,
                                             Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
                                             g1 = g1,g0=g0,
                                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC, 
-                                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, Rd0 = Rd0)
-    Medlyn_preds$P = get_Pleaf_Medlyn(Medlyn_preds, P50 = P50, P88 = P88, 
-                                      Ps = df$Ps[1], kmax_25 = kmax_25, constant_kmax = constant_kmax)
+                                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, Rd0 = Rd0,
+                                            b_USO = b_USO, Ps = df$Ps
+                                            )
+    get_Pleaf_Medlyn_V = Vectorize(get_Pleaf_Medlyn, c("Ps", "Tair", "E"))
+    Medlyn_preds$P = get_Pleaf_Medlyn_V(
+      Ps = df$Ps, Tair = df$Tair, E = Medlyn_preds$ELEAF, 
+      P50 = P50, P88 = P88, kmax_25 = kmax_25, constant_kmax = FALSE)
     
     Medlyn_preds_sim = Medlyn_preds %>%
       rename(E = ELEAF, Dleaf = VPDleaf, gs = GS, A = ALEAF) %>%
       mutate(Model = "Medlyn", .before = 1) %>%
+      #mutate(P = NA) %>% 
       select(Model, Tair, E, Tleaf, Dleaf, gs, A, P)
     
     # Combine all predictions
@@ -1298,69 +738,61 @@ get_preds_theoretical_sims =
     return(out_all)
   }
 
-
-get_Pleaf_Medlyn = function(pred_df, P50, P88, Ps, kmax_25, constant_kmax) {
+# Estimate Pleaf for the USO model
+get_Pleaf_Medlyn = function(Ps, E, Tair, P50, P88, kmax_25, constant_kmax) {
   
   # Hydraulics
   Weibull = fit_Weibull(P50, P88)
   b = Weibull[1,1]
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
+  
   P = Ps_to_Pcrit(Ps, Pcrit)
+  E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
+  j = which.min(abs(E - E_vec))
+  Pleaf = P[j]
   
-  E = pred_df$ELEAF
-  Tair = pred_df$Tair
-  
-  Pleaf_vec = sapply(1:length(E), function(i) {
-    E_vec = trans_from_vc(P, kmax_25, Tair[i], b, c, constant_kmax)
-    j = which.min(abs(E[i] - E_vec))
-    Pleaf = P[j]
-    return(Pleaf)
-  })
-  
-  return(Pleaf_vec)
+  return(Pleaf)
 }
 
-calc_A_corr = function (Tair = 25, VPD = 1.5, PPFD = 1000, Patm = 101.325, 
-                        E = 2, Wind = 2, Wleaf = 0.01, LeafAbs = 0.5, Ca = 420, 
-                        Jmax = 100, Vcmax = 50, net = FALSE, Rd0 = 0.92, TrefR = 25, 
-                        netOrig = TRUE, g1 = 2.9, g0 = 0.003, g_w = NULL, Tleaf = NULL, 
-                        new_JT = FALSE,
-                        ...) 
-{
-  if (is.null(g_w) & is.null(Tleaf)) {
-    Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD, 
-                       E = E, Wind = Wind, Patm = Patm, Wleaf = Wleaf, 
-                       LeafAbs = LeafAbs)
-    g_w = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind, 
-                  Wleaf)
-  }
-  if (net == FALSE) {
-    Photosyn_out = mapply(plantecophys::Photosyn, VPD = VPD, 
-                          Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm, 
-                          GS = g_w, Rd = 0, Jmax = Jmax, Vcmax = Vcmax, g1 = g1, 
-                          g0 = g0, new_JT = new_JT, ...)
-    Anet = as.numeric(Photosyn_out[2, ])
-    Rd = as.numeric(Photosyn_out[8, ])
-    A = Anet + Rd
-  }
-  else {
-    if (isTRUE(netOrig)) {
-      Photosyn_out = mapply(plantecophys::Photosyn, VPD = VPD, 
-                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm, 
-                            GS = g_w, Jmax = Jmax, Vcmax = Vcmax, g1 = g1, 
-                            g0 = g0, new_JT = new_JT, ...)
-      A = as.numeric(Photosyn_out[2, ])
+
+# Make predictions with different Tcrit/T50 values
+make_pred_Tthresholds = function(df, Wind = 8, Wleaf = 0.025, LeafAbs=0.5,
+                                 hold_Tcrit = FALSE,
+                                 Thold_val = 49.6,
+                                 Tvar_vals = c(43.4, 45.5, 47.5, 48.5),
+                                 constr_Ci = FALSE,
+                                 ...) {
+  if(isTRUE(hold_Tcrit)) {
+    Tcrit = Thold_val
+    T50s = Tvar_vals
+    
+    sims.l = lapply(T50s, function(T50,...) {
+      preds = get_predictions(df, Tcrit = Tcrit, T50 = T50) %>% 
+        filter(Model == "Sperry + CGnet + TC")
     }
-    else {
-      Rd = Rd0 * exp(0.1012 * (Tleaf - TrefR) - 5e-04 * 
-                       (Tleaf^2 - TrefR^2))
-      Photosyn_out = mapply(plantecophys::Photosyn, VPD = VPD, 
-                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm, 
-                            GS = g_w, Rd = 0, Jmax = Jmax, Vcmax = Vcmax, 
-                            g1 = g1, g0 = g0, new_JT = new_JT, ...)
-      A = as.numeric(Photosyn_out[2, ]) - Rd
+    )
+    names(sims.l) = paste0("T50_", Tvar_vals)
+    preds = bind_rows(sims.l, .id = "ID") %>% 
+      mutate(Tcrit = Thold_val,
+             T50 = str_sub(ID, 5)) %>% 
+      select(!ID)
+  } else {
+    T50 = Thold_val
+    Tcrits = Tvar_vals
+    
+    sims.l = lapply(Tcrits, function(Tcrit,...) {
+      preds = get_predictions(df, Tcrit = Tcrit, T50 = T50) %>% 
+        filter(Model == "Sperry + CGnet + TC")
     }
+    )
+    names(sims.l) = paste0("T50_", Tvar_vals)
+    preds = bind_rows(sims.l, .id = "ID") %>% 
+      mutate(T50 = Thold_val,
+             Tcrit = str_sub(ID, 5)) %>% 
+      select(!ID)
   }
-  return(A)
+  preds = preds %>% mutate(across(Tair:A, as.numeric),
+                           across(T50:Tcrit, as.factor))
+  return(preds)
 }
