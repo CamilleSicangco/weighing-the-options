@@ -133,11 +133,8 @@ load("data/out/heatwave_runs.Rdata")
 
 preds = list(list(control, pred.c), list(heatwave, pred.hw))
 out.l = lapply(preds, function(ls) {
-  #ls[[2]] = ls[[2]] %>% arrange(Model)
-  out = data.frame(#datetime = rep(ls[[1]]$DateTime_hr, times = 6),
-                   datetime = c(ls[[1]]$DateTime_hr, rep(ls[[1]]$DateTime_hr, each = 4), 
+  out = data.frame(datetime = c(ls[[1]]$DateTime_hr, rep(ls[[1]]$DateTime_hr, each = 4), 
                                 ls[[1]]$DateTime_hr),
-                   #chamber = rep(ls[[1]]$chamber, times = 6),
                    chamber = c(ls[[1]]$chamber, rep(ls[[1]]$chamber, each = 4), 
                                 ls[[1]]$chamber),
                    Model = c(rep("observed", nrow(ls[[1]])), ls[[2]]$Model),
@@ -198,16 +195,7 @@ ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height 
 
 ## Figure 6: Tleaf predictions vs observations -------------------------
 
-#test_df = bind_rows(out.l, .id = "treatment")
-#test = paste(
-  #heatwave$DateTime_hr, heatwave$chamber
- # out.l$heatwave$datetime, out.l$heatwave$chamber, out.l$heatwave$Model
-  #           )
-#n_occur = data.frame(table(test))
-#n_occur[n_occur$Freq > 1,]
-
 Tleaf_pred_obs.plt = 
-  #out.l$heatwave %>% 
   bind_rows(out.l, .id = "treatment") %>% 
   pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime, treatment)) %>% 
   pivot_longer(cols = Medlyn:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf_pred") %>% 

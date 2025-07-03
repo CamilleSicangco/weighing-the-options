@@ -796,3 +796,11 @@ make_pred_Tthresholds = function(df, Wind = 8, Wleaf = 0.025, LeafAbs=0.5,
                            across(T50:Tcrit, as.factor))
   return(preds)
 }
+
+# From plantecophys
+# Jmax temperature response (Arrhenius)
+TJmax <- function(Tleaf, EaJ, delsJ, EdVJ){
+  J1 <- 1+exp((298.15*delsJ-EdVJ)/8.314/298.15)
+  J2 <- 1+exp(((Tleaf + 273.15)*delsJ-EdVJ)/8.314/(Tleaf + 273.15))
+  exp(EaJ/8.314*(1/298.15 - 1/(Tleaf + 273.15)))*J1/J2
+}
