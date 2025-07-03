@@ -10,7 +10,6 @@ WTC4_data$DateTime_hr <- as.POSIXct(WTC4_data$DateTime_hr,format="%Y-%m-%d %T",t
 
 ## Control ---------------------------------------------------------------------
 
-### Process data ---------------------------------------------------------------
 # Subset the model predictions for the ambient treatment  
 control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 
@@ -58,7 +57,7 @@ g1 = 2.4
 b = 0.97
 
 # Get gs model predictions
-pred.c = get_predictions(df = control, b_USO = 0, g1 = 2.9)
+pred.c = get_predictions(df = control, b_USO = 0, g1 = 2.9, Tcrit = 42.1, T50 = 48.4)
 
 pred.c$Tdiff <- with(pred.c,Tleaf-Tair)
 
@@ -199,13 +198,13 @@ ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height 
 
 ## Figure 6: Tleaf predictions vs observations -------------------------
 
-test_df = bind_rows(out.l, .id = "treatment")
-test = paste(
+#test_df = bind_rows(out.l, .id = "treatment")
+#test = paste(
   #heatwave$DateTime_hr, heatwave$chamber
-  out.l$heatwave$datetime, out.l$heatwave$chamber, out.l$heatwave$Model
-             )
-n_occur = data.frame(table(test))
-n_occur[n_occur$Freq > 1,]
+ # out.l$heatwave$datetime, out.l$heatwave$chamber, out.l$heatwave$Model
+  #           )
+#n_occur = data.frame(table(test))
+#n_occur[n_occur$Freq > 1,]
 
 Tleaf_pred_obs.plt = 
   #out.l$heatwave %>% 
@@ -245,7 +244,7 @@ Fig7_PleafvT =
   bind_rows(out.l) %>% 
   filter(!is.na(Pleaf)) %>% 
   ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
-  geom_point(shape = 1)+
+  geom_point(shape = 1) +
   scale_color_manual(values = palette[-c(6)],
                      labels = c("USO",
                                 "ProfitMax",
@@ -259,9 +258,9 @@ Fig7_PleafvT =
   guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
          linetype = "none") +
   geom_hline(yintercept = 4.07, linetype = "dashed", colour = "darkorange") +
-  annotate("text", x = 20, y = P50, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
-  geom_hline(yintercept = P88, linetype = "dashed", colour = "orangered3") +
-  annotate("text", x = 20, y = P88, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
+  annotate("text", x = 20, y = 4.07, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
+  geom_hline(yintercept = 5.50, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
   theme(text = element_text(size = 16))
 Fig7_PleafvT
 ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
@@ -269,30 +268,28 @@ ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
 # Calculate TSM and HSM ########################################################
 
 # TSM
-TSM_summary = out.hw %>%
-  filter(model != "observed") %>% 
-  rename(Model = model) %>% 
-  bind_rows(pred3.hw) %>% 
+TSM_summary = out.l$heatwave %>%
+  filter(Model != "observed") %>% 
   group_by(Model) %>% 
   summarise(Tleaf_max = max(Tleaf)) %>% 
   mutate(TSM_Tcrit = 43.4 - Tleaf_max,
-         TSM_T50 = 49.9 - Tleaf_max) %>% 
-  arrange(factor(Model, levels = c("Medlyn", "Sperry", "Sperry + TC", 
-                                   "Sperry + CGnet", "Sicangco"))) %>% 
+         TSM_T50 = 49.6 - Tleaf_max) %>% 
+  arrange(factor(Model, levels = c("Medlyn", "Sperry", 
+                                   "Sperry + varkmax", "Sperry + CGnet", 
+                                   "Sperry + CGnet + TC"))) %>% 
   as.data.frame()
 write.csv(TSM_summary, "data/out/TSM_summary.csv", row.names = FALSE)
 
 # HSM
-HSM_summary = out.hw %>%
-  filter(model != "observed") %>% 
-  rename(Model = model, P = Pleaf) %>% 
-  bind_rows(pred3.hw) %>% 
+HSM_summary = out.l$heatwave %>%
+  filter(Model != "observed") %>% 
   group_by(Model) %>% 
-  summarise(Pleaf_min = max(P)) %>% 
+  summarise(Pleaf_min = max(Pleaf)) %>% 
   mutate(HSM_P50 = 4.07 - Pleaf_min,
          HSM_P88 = 5.50 - Pleaf_min) %>% 
-  arrange(factor(Model, levels = c("Medlyn", "Sperry", "Sperry + TC", 
-                                   "Sperry + CGnet", "Sicangco")))
+  arrange(factor(Model, levels = c("Medlyn", "Sperry", 
+                                   "Sperry + varkmax", "Sperry + CGnet", 
+                                   "Sperry + CGnet + TC")))
 write.csv(HSM_summary, "data/out/HSM_summary.csv", row.names = FALSE)
 
 
@@ -304,12 +301,11 @@ eval_model = function(fit_group = c("low", "medium", "high", "none"),
                       variable = c("E", "A", "gs", "Dleaf", "Tleaf")
 )
 {
-  out.c_wide = out.c %>% 
-    pivot_wider(names_from = Model, values_from = c(E, A, gs, Dleaf, Tleaf))
-  out.hw_wide = out.hw %>% select(datetime:Tleaf) %>% 
+  df = if (treatment == "control") {out.l$control} else {out.l$heatwave}
+  df = df %>% 
+    select(!Pleaf) %>% 
     pivot_wider(names_from = Model, values_from = c(E, A, gs, Dleaf, Tleaf))
   
-  df = if (treatment == "control") {out.c_wide} else {out.hw_wide}
   
   df = if (fit_group == "low") {
     df %>% filter(Tleaf_observed < 25)
@@ -341,15 +337,22 @@ eval_model = function(fit_group = c("low", "medium", "high", "none"),
 eval_model(fit_group = "none",treatment = "heatwave", model = "Sperry", variable = "E")
 
 ## Data binned by temperature --------------------------------------------------
-model_eval_df = data.frame(treatment = c(rep("control", 30), rep("heatwave", 45)),
-                           fit_group = c(rep(c("low", "medium"), each = 15, times = 2), rep("high", 15)),
-                           model = rep(c("Medlyn", "Sicangco", "Sperry"), times = 25), 
-                           variable = rep(c("E", "A", "gs", "Dleaf", "Tleaf"), each = 3, times = 5)
+
+# Generate evaluation metrics
+model_eval_df = data.frame(treatment = c(rep("control", 50), rep("heatwave", 75)),
+                           fit_group = c(rep(c("low", "medium"), each = 25, times = 2), rep("high", 25)),
+                           Model = rep(c("Medlyn", "Sperry", "Sperry + varkmax", 
+                                         "Sperry + CGnet", "Sperry + CGnet + TC"), times = 25), 
+                           variable = rep(c("E", "A", "gs", "Dleaf", "Tleaf"), each = 5, times = 5)
 )
+model_eval_df$Model = factor(model_eval_df$Model,
+                             levels = c("observed", "Medlyn", "Sperry", 
+                                        "Sperry + varkmax", "Sperry + CGnet", 
+                                        "Sperry + CGnet + TC"))
 model_evals = sapply(1:nrow(model_eval_df), 
                      function(i) eval_model(model_eval_df$fit_group[i],
                                             model_eval_df$treatment[i],
-                                            model_eval_df$model[i], 
+                                            model_eval_df$Model[i], 
                                             model_eval_df$variable[i]))
 model_evals = as_data_frame(t(model_evals))
 model_eval_df = cbind(model_eval_df, model_evals)
@@ -357,18 +360,18 @@ model_eval_df = cbind(model_eval_df, model_evals)
 model_eval_df$fit_group = factor(model_eval_df$fit_group, 
                                  levels = c("low", "medium", "high"))
 
-model_eval_df %>% 
-  filter(treatment == "heatwave") %>% 
-  ggplot(aes(x = model, y = MAE)) +
-  geom_col(fill = "darkorange") +
-  facet_wrap(fit_group ~ variable, scales = "free", ncol = 5) +
-  theme_classic() +
-  ylab("MAE")
+# Plot metrics
+MAE_plt_binned.hw = plot_evals(model_eval_df, "heatwave", "MAE", binned = TRUE)
+R2_plt_binned.hw = plot_evals(model_eval_df, "heatwave", "R2", binned = TRUE)
+MAE_plt_binned.c = plot_evals(model_eval_df, "control", "MAE", binned = TRUE)
+R2_plt_binned.c = plot_evals(model_eval_df, "control", "R2", binned = TRUE)
 
 ## Unbinned data----------------------------------------------------------------
+
+# Generate evaluation metrics
 model_eval_df_unbinned = data.frame(treatment = rep(c("control", "heatwave"), each = 25),
                                     fit_group = rep("none", 50),
-                                    model = rep(c("Medlyn", "Sperry", "Sperry + varkmax", 
+                                    Model = rep(c("Medlyn", "Sperry", "Sperry + varkmax", 
                                                   "Sperry + CGnet", "Sperry + CGnet + TC"), 
                                                 times = 10), 
                                     variable = rep(c("E", "A", "gs", "Dleaf", "Tleaf"), each = 5, times = 2)
@@ -376,61 +379,20 @@ model_eval_df_unbinned = data.frame(treatment = rep(c("control", "heatwave"), ea
 model_evals_unbinned = sapply(1:nrow(model_eval_df_unbinned), 
                      function(i) eval_model(model_eval_df_unbinned$fit_group[i],
                                             model_eval_df_unbinned$treatment[i],
-                                            model_eval_df_unbinned$model[i], 
+                                            model_eval_df_unbinned$Model[i], 
                                             model_eval_df_unbinned$variable[i]))
 model_evals_unbinned = as_data_frame(t(model_evals_unbinned))
 model_eval_df_unbinned = cbind(model_eval_df_unbinned, model_evals_unbinned)
 
-model_eval_df_unbinned$model = gsub("Sperry", "ProfitMax",
-                                    gsub("Medlyn", "USO",
-                                         gsub("Sicangco", "Si", model_eval_df_unbinned$model)))
+# Plot metrics
+MAE_plt.hw = plot_evals(model_eval_df_unbinned, "heatwave", "MAE", binned = FALSE)
+R2_plt.hw = plot_evals(model_eval_df_unbinned, "heatwave", "R2", binned = FALSE)
+MAE_plt.c = plot_evals(model_eval_df_unbinned, "control", "MAE", binned = FALSE)
+R2_plt.c = plot_evals(model_eval_df_unbinned, "control", "R2", binned = FALSE)
 
-MAE_plt.hw = model_eval_df_unbinned %>% 
-  filter(treatment == "heatwave") %>% 
-  ggplot(aes(x = model, y = MAE)) +
-  geom_col(fill = "darkorange") +
-  facet_wrap(vars(variable), scales = "free", ncol = 5) +
-  theme_classic() +
-  ylab("MAE")
-
-R2_plt.hw = model_eval_df_unbinned %>% 
-  filter(treatment == "heatwave") %>% 
-  ggplot(aes(x = model, y = R2)) +
-  geom_col(fill = "darkorange") +
-  facet_wrap(vars(variable), scales = "free", ncol = 5) +
-  theme_classic() +
-  ylab("R2")
-
-MAE_plt.c = model_eval_df_unbinned %>% 
-  filter(treatment == "control") %>% 
-  ggplot(aes(x = model, y = MAE)) +
-  geom_col(fill = "lightblue") +
-  facet_wrap(vars(variable), scales = "free", ncol = 5) +
-  theme_classic() +
-  ylab("MAE")
-
-R2_plt.c = model_eval_df_unbinned %>% 
-  filter(treatment == "control") %>% 
-  ggplot(aes(x = model, y = R2)) +
-  geom_col(fill = "lightblue") +
-  facet_wrap(vars(variable), scales = "free", ncol = 5) +
-  theme_classic() +
-  ylab("R2")
 
 ggarrange(MAE_plt.c + ggtitle("Control"), 
           MAE_plt.hw + ggtitle("Heatwave"), 
           R2_plt.c, 
-          R2_plt.hw)
-
-out.hw %>% 
-ggplot() +
-  geom_point(aes(x = Tleaf, y = gs, color = model), alpha = .5, size = .5) +
-  theme_classic() +
-  scale_color_manual(
-    values = c("observed" = "black", "Medlyn" = "#D81B60", 
-               "Sicangco" = "#FFC107", "Sperry" = "#1E88E5")) +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  #ylab(expression("A (" * mu * "mol m"^-2*"s"^-1*")")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") +
-  theme(plot.title = element_blank())
+          R2_plt.hw, 
+          common.legend = TRUE)
