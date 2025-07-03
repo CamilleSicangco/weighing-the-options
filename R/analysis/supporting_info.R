@@ -3,8 +3,12 @@
 # 19 June 2025
 
 # Fig S1: Jmax-T response w/ and w/o TC ########################################
+
+Tair_vec = seq(20,60)
+
 Jold = TJmax(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635)
 Jnew = TJmax_updated(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635, Tcrit = 43.4, T50 = 49.6)
+
 FigS2 = data.frame(Tair = rep(Tair_vec, 2), 
                    Jmax = c(Jold, Jnew),
                    Method = rep(c("old", "new"), each = length(Tair_vec))) %>%
@@ -20,25 +24,11 @@ FigS2 = data.frame(Tair = rep(Tair_vec, 2),
                           expression(italic("J")["peakedArr"])
                         )) +
   guides(linetype = guide_legend(title = expression("J"[max])))
-ggsave("figs/FigS2_JvsT.tiff", FigS2, height = 6, width = 10)
+ggsave("figs/FigS1_JvsT.tiff", FigS2, height = 6, width = 10)
 
 # Fig S2: Predawn time series ##################################################
-predawn_LWP =  
-  predawn_df %>% 
-  filter(tissue == "leaf") %>% 
-  rename(Ps = LWP) %>% 
-  mutate(date = as.POSIXct(Date)) %>% 
-  as.data.frame()
 
-FigS3 = ggplot(NULL, aes(x = date, y = Ps, color = chamber)) +
-  geom_point(data = predawn_LWP) +
-  geom_line(data = predawn_est) +
-  theme_classic() +
-  guides(color = guide_legend(title = "Chamber")) +
-  xlab("Date") +
-  ylab(expression("Predawn  "*psi[leaf]*" (MPa)")) +
-  theme(text = element_text(size = 14))
-ggsave("figs/FigS3_Pleaf_timeseries.tiff", FigS3, height = 6, width = 10)
+# See R/processing/WTC4_data_processing.R
 
 # Fig S3: Theoretical simulations with constant VPD ############################
 

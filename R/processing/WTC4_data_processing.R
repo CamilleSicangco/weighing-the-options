@@ -133,6 +133,24 @@ predawn_est$Ps = sapply(1:nrow(predawn_est), function(i) {
   return(Ps)
 })
 
+## Fig S2 ---------------------------
+predawn_LWP =  
+  predawn_df %>% 
+  filter(tissue == "leaf") %>% 
+  rename(Ps = LWP) %>% 
+  mutate(date = as.POSIXct(Date)) %>% 
+  as.data.frame()
+
+FigS2 = ggplot(NULL, aes(x = date, y = Ps, color = chamber)) +
+  geom_point(data = predawn_LWP) +
+  geom_line(data = predawn_est) +
+  theme_classic() +
+  guides(color = guide_legend(title = "Chamber")) +
+  xlab("Date") +
+  ylab(expression("Predawn  "*psi[leaf]*" (MPa)")) +
+  theme(text = element_text(size = 14))
+ggsave("figs/FigS2_Pleaf_timeseries.tiff", FigS3, height = 6, width = 10)
+
 # Combine with other WTC data
 WTC4_data$Ps = sapply(1:nrow(WTC4_data), function(i) {
   date = as.Date(WTC4_data$DateTime_hr[i])
