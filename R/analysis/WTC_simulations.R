@@ -162,9 +162,9 @@ palette = c(Sperry = "#1E88E5", "Sperry + varkmax" = "#332288", "Sperry + CGnet"
 
 # Plot A and E versus canopy temperature for the control and heatwave treatments 
 EvT.c = plot_AEvT_WTC(gam_E.c, out.l$control, "E")
-AvT.c = plot_AEvT_WTC(gam_E.c, out.l$control, "A")
+AvT.c = plot_AEvT_WTC(gam_A.c, out.l$control, "A")
 EvT.hw = plot_AEvT_WTC(gam_E.hw, out.l$heatwave, "E")
-AvT.hw = plot_AEvT_WTC(gam_E.c, out.l$heatwave, "A")
+AvT.hw = plot_AEvT_WTC(gam_A.c, out.l$heatwave, "A")
 
 # Combine all plots (i.e. recreate Drake et al. Fig 5 with all models)
 AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) + 
@@ -222,8 +222,8 @@ Tleaf_pred_obs.plt =
   geom_vline(xintercept = 49.6, linetype = "dashed", colour = "orangered3") +
   geom_hline(yintercept = 49.6, linetype = "dashed", colour = "orangered3") +
   annotate("text", x=T50, y = 10, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 5)+
-  theme(plot.title = element_blank(),text = element_text(size = 14)) 
-Tleaf_pred_obs.plt 
+  theme(plot.title = element_blank(),text = element_text(size = 14)) +  
+  xlim(NA, 53)
 ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11)
 
 ## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
@@ -249,8 +249,8 @@ Fig7_PleafvT =
   annotate("text", x = 20, y = 4.07, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
   geom_hline(yintercept = 5.50, linetype = "dashed", colour = "orangered3") +
   annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
-  theme(text = element_text(size = 16))
-Fig7_PleafvT
+  theme(text = element_text(size = 16)) +
+  ylim(NA,5.7)
 ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
 
 # Calculate TSM and HSM ########################################################

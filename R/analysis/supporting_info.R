@@ -9,7 +9,7 @@ Tair_vec = seq(20,60)
 Jold = TJmax(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635)
 Jnew = TJmax_updated(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635, Tcrit = 43.4, T50 = 49.6)
 
-FigS2 = data.frame(Tair = rep(Tair_vec, 2), 
+FigS1 = data.frame(Tair = rep(Tair_vec, 2), 
                    Jmax = c(Jold, Jnew),
                    Method = rep(c("old", "new"), each = length(Tair_vec))) %>%
   ggplot(aes(x = Tair, y = Jmax, linetype = Method)) +
@@ -24,7 +24,7 @@ FigS2 = data.frame(Tair = rep(Tair_vec, 2),
                           expression(italic("J")["peakedArr"])
                         )) +
   guides(linetype = guide_legend(title = expression("J"[max])))
-ggsave("figs/FigS1_JvsT.tiff", FigS2, height = 6, width = 10)
+ggsave("figs/FigS1_JvsT.tiff", FigS1, height = 6, width = 10)
 
 # Fig S2: Predawn time series ##################################################
 

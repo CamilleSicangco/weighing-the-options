@@ -48,22 +48,6 @@ load("data/out/theoretical_sims_constRH.Rdata")
 
 # PLOTTING #####################################################################
 
-## Constant VPD ----------------------
-
-# Combine dataframes into one list
-outputs_constVPD = list(out_Ps0.5_constVPD, out_Ps2_constVPD, out_Ps4_constVPD)
-
-# Generate composite plots
-gsAPleafvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "gs, A, Pleaf")
-EDvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "E, Dleaf")
-
-# Save plots
-ggsave(gsAPleafvsTleaf_constVPD.plt,
-       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.tiff", width = 12.25, height = 10)
-ggsave(EDvsTleaf_constVPD.plt,
-       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.pdf", width = 12.25, height = 6.5)
-
-
 ## Constant RH -----------------------
 
 # Combine dataframes into one list
@@ -77,7 +61,7 @@ EDvsTleaf_constRH.plt = plot_composite_Trange(outputs_constRH, vars = "E, Dleaf"
 ggsave(gsAPleafvsTleaf_constRH.plt,
        filename = "figs/Fig1_TheoreticalSims_gsAPleafvsTleaf_constRH.tiff", width = 12.25, height = 10)
 ggsave(EDvsTleaf_constRH.plt,
-       filename = "figs/TheoreticalSims_EDvsTleaf_constRH.pdf", width = 12.25, height = 6.5)
+       filename = "figs/TheoreticalSims_EDvsTleaf_constRH.tiff", width = 12.25, height = 6.5)
 
 # Plot Tleaf vs Tair
 Tleaf_plts.l = lapply(outputs_constRH, function(df) {
@@ -98,18 +82,34 @@ Tleaf_comb_plt = plot_grid(Tleaf_plts.l[[1]] +
                                    axis.text.y = element_blank(),
                                    axis.ticks.y = element_blank(),
                                    plot.title = element_text(size = 12, face = "bold")), 
-                                   Tleaf_plts.l[[3]] +
-                                     ggtitle(expression(bold(psi[s]*" = -4 MPa"))) + 
-                                               theme(legend.position = "none",
-                                                     axis.title.x = element_blank(),
-                                                     axis.title.y = element_blank(),
-                                                     axis.text.y = element_blank(),
-                                                     axis.ticks.y = element_blank(),
-                                                     plot.title = element_text(size = 12, face = "bold")), 
-                                             nrow = 1, rel_widths = c(1, 0.85, 0.85))
+                           Tleaf_plts.l[[3]] +
+                             ggtitle(expression(bold(psi[s]*" = -4 MPa"))) + 
+                             theme(legend.position = "none",
+                                   axis.title.x = element_blank(),
+                                   axis.title.y = element_blank(),
+                                   axis.text.y = element_blank(),
+                                   axis.ticks.y = element_blank(),
+                                   plot.title = element_text(size = 12, face = "bold")), 
+                           nrow = 1, rel_widths = c(1, 0.85, 0.85))
 TleafvsTair.plt = plot_grid(legend, 
-          annotate_figure(Tleaf_comb_plt, bottom = text_grob(expression("T"[air]*" (\u00B0C)"), size = 16)), 
-          nrow = 2, rel_heights = c(.1,1)) +
+                            annotate_figure(Tleaf_comb_plt, bottom = text_grob(expression("T"[air]*" (\u00B0C)"), size = 16)), 
+                            nrow = 2, rel_heights = c(.1,1)) +
   theme(plot.margin = margin(t = 10, r = 10, b = 10, l = 10))
 ggsave(TleafvsTair.plt,
-       filename = "figs/TheoreticalSims_TleafvsTair.pdf", width = 12.25, height = 5.5)
+       filename = "figs/TheoreticalSims_TleafvsTair.tiff", width = 12.25, height = 5.5)
+
+
+## Constant VPD ----------------------
+
+# Combine dataframes into one list
+outputs_constVPD = list(out_Ps0.5_constVPD, out_Ps2_constVPD, out_Ps4_constVPD)
+
+# Generate composite plots
+gsAPleafvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "gs, A, Pleaf")
+EDvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "E, Dleaf")
+
+# Save plots
+ggsave(gsAPleafvsTleaf_constVPD.plt,
+       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.tiff", width = 12.25, height = 10)
+ggsave(EDvsTleaf_constVPD.plt,
+       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.tiff", width = 12.25, height = 6.5)
