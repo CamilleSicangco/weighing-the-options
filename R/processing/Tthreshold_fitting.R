@@ -6,7 +6,7 @@ T50_raw_data = read.csv("data/in/raw/WTC_TEMP-PARRA_CM_T50_20161019-20161117_L0.
 
 # Plot Fv/Fm measured at start of the heatwave 
 T50_raw_data %>% 
-  filter(Time == "R30",
+  filter(Time == "ON",
          Date %in% c("2016-11-01", "2016-11-02")) %>% 
   ggplot(aes(x = T_treat, y = Fv.Fm, color = as.factor(Replicate))) +
     geom_point() +
@@ -25,13 +25,13 @@ T50_data.l = split(T50_data, ~chamber)
 
 # Fit Tcrit, T50
 fl_fits = sapply(T50_data.l, function(df) {
-  max = max(df$Fv.Fm[df$Time == "R30" & df$T_treat == 24])
+  max = max(df$Fv.Fm[df$Time == "ON" & df$T_treat == 24])
   
-  T50.fit = fitcond(dfr = filter(df, Time == "R30"),
+  T50.fit = fitcond(dfr = filter(df, Time == "ON"),
                     varnames = c(K = "Fv.Fm", WP = "T_treat"),
                     Kmax = max,
                     x = 50)
-  Tcrit.fit = fitcond(dfr = filter(df, Time == "R30"),
+  Tcrit.fit = fitcond(dfr = filter(df, Time == "ON"),
                       varnames = c(K = "Fv.Fm", WP = "T_treat"),
                       Kmax = max,
                       x = 5)

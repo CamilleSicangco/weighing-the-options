@@ -11,8 +11,8 @@ VPD = RHtoVPD(RH = 60, Tair)
 PPFD = 1500
 
 # Thermal damage
-Tcrit = 43.4
-T50 = 49.6
+Tcrit = 46.5
+T50 = 50.4
 
 # Hydraulics
 Weibull = fit_Weibull(P50 = 4.47, P88 = 5.50)

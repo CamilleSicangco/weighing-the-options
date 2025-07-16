@@ -7,7 +7,7 @@
 Tair_vec = seq(20,60)
 
 Jold = TJmax(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635)
-Jnew = TJmax_updated(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635, Tcrit = 43.4, T50 = 49.6)
+Jnew = TJmax_updated(Tair_vec,EaJ=33115,EdVJ=2e5,delsJ=635, Tcrit = 46.5, T50 = 50.4)
 
 FigS1 = data.frame(Tair = rep(Tair_vec, 2), 
                    Jmax = c(Jold, Jnew),

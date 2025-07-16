@@ -18,12 +18,12 @@ preds_varTcrit_constRH = make_pred_Tthresholds(Tair_sim_constRH.df)
 # Hold Tcrit constant, vary T50
 preds_varT50_constVPD = make_pred_Tthresholds(Tair_sim_constVPD.df, 
                                      hold_Tcrit = TRUE,
-                                     Thold_val = 43.4,
-                                     Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
+                                     Thold_val = 46.5,
+                                     Tvar_vals = c(47.5, 48.5, 49.5, 50.4))
 preds_varT50_constRH = make_pred_Tthresholds(Tair_sim_constRH.df, 
                                               hold_Tcrit = TRUE,
-                                              Thold_val = 43.4,
-                                              Tvar_vals = c(44.5, 45.5, 47.5, 49.6))
+                                              Thold_val = 46.5,
+                                              Tvar_vals = c(47.5, 48.5, 49.5, 50.4))
 
 # List all predictions
 preds.l = list(preds_varTcrit_constRH, preds_varTcrit_constVPD,

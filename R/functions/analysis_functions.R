@@ -39,7 +39,7 @@ make_pred = function(
     Wind = 8,
     Wleaf = 0.025,
     LeafAbs=0.5,
-    Tcrit = 43.4,
+    Tcrit = 46.5,
     T50 = 59.6,
     kmax_25 = 0.5,
     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
@@ -95,8 +95,8 @@ make_pred_fn = function(P, b, c,
                          Wind, 
                          LeafAbs = 0.5,
                          Wleaf = 0.025,
-                         Tcrit = 43.4,
-                         T50 = 49.6,
+                         Tcrit = 46.5,
+                         T50 = 50.4,
                          P50 = 4.07,
                          P88 = 5.50,
                          kmax_25 = 0.5,
@@ -226,12 +226,12 @@ Photosyn_custom <- function(VPD=1.5,
                      returnParsOnly=FALSE,
                      whichA=c("Ah","Amin","Ac","Aj"),
                      
-                     Tcrit = 43.4,
-                     T50 = 49.6,
+                     Tcrit = 46.5,
+                     T50 = 50.4,
                      
                      new_JT = TRUE,
                      
-                     b_USO = 0.97, # sensitivity of g1 to SWP
+                     b_USO = 0.55, # sensitivity of g1 to SWP
                      Ps = 0.5 # soil water potential, -MPa
                      ){
   
@@ -695,12 +695,12 @@ fVJ.a<-as.formula(Jmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))
 # Generate predictions with all models
 get_predictions = 
   function(
-    df, Tcrit = 43.4, T50 = 49.6, P50 = 4.07, P88 = 5.50,
+    df, Tcrit = 46.5, T50 = 50.4, P50 = 4.07, P88 = 5.50,
     Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
     kmax_25 = 0.5, #net = TRUE, netOrig = TRUE,
-    g1 = 2.4,g0=1.e-5, b_USO = 0.97,
+    g1 = 2.9, g0=1.e-5, b_USO = 0.55,
     constr_Ci = FALSE,
     ...
   ) {
@@ -759,8 +759,8 @@ get_Pleaf_Medlyn = function(Ps, E, Tair, P50, P88, kmax_25, constant_kmax) {
 # Make predictions with different Tcrit/T50 values
 make_pred_Tthresholds = function(df, Wind = 8, Wleaf = 0.025, LeafAbs=0.5,
                                  hold_Tcrit = FALSE,
-                                 Thold_val = 49.6,
-                                 Tvar_vals = c(43.4, 45.5, 47.5, 48.5),
+                                 Thold_val = 50.4,
+                                 Tvar_vals = c(46.5, 47.5, 48.5, 49.5),
                                  constr_Ci = FALSE,
                                  ...) {
   if(isTRUE(hold_Tcrit)) {

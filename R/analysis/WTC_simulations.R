@@ -6,6 +6,14 @@
 WTC4_data = read.csv("data/in/WTC4_data.csv")
 WTC4_data$DateTime_hr <- as.POSIXct(WTC4_data$DateTime_hr,format="%Y-%m-%d %T",tz="GMT")
 
+# Determine max VPDs during the heatwave
+VPDs = WTC4_data %>% 
+  dplyr::filter(DateTime_hr >= as.POSIXct("2016-11-01") & DateTime_hr <= as.POSIXct("2016-11-04")) %>% 
+  group_by(chamber, HWtrt) %>% 
+  summarise(maxVPD = max(VPD))
+range(VPDs$maxVPD[VPDs$HWtrt == "C"])
+range(VPDs$maxVPD[VPDs$HWtrt == "HW"])
+
 # Fit models ###################################################################
 
 ## Control ---------------------------------------------------------------------
@@ -48,16 +56,9 @@ gs_fits <- nls(gs ~ g0 + 1.6*(1+g1/sqrt(VPD))*(A/400),
                algorithm="port",
                lower=c(0,0),upper=c(1e-9,10))
 coef(gs_fits)
-#g0 = unname(coef(gs_fits)[1])
-g1 = unname(coef(gs_fits)[2])
-#g0=0
-#g1 = 2.9
-g0=0.003
-g1 = 2.4
-b = 0.97
 
 # Get gs model predictions
-pred.c = get_predictions(df = control, b_USO = 0, g1 = 2.9, Tcrit = 42.1, T50 = 48.4)
+pred.c = get_predictions(df = control, b_USO = 0, Tcrit = 43.7, T50 = 48.6)
 
 pred.c$Tdiff <- with(pred.c,Tleaf-Tair)
 
@@ -117,7 +118,7 @@ gam_E.hw = gam(E ~ s(Tcan), data = heatwave)
 gam_A.hw = gam(A ~ s(Tcan), data = heatwave)
 
 # Get gs model predictions
-pred.hw = get_predictions(df = heatwave, b_USO = 0, g1 = 2.9)
+pred.hw = get_predictions(df = heatwave, b_USO = 0)
 
 # Check if any model predicts negative gs values
 sapply(unique(pred.hw$Model), 
@@ -260,8 +261,8 @@ TSM_summary = out.l$heatwave %>%
   filter(Model != "observed") %>% 
   group_by(Model) %>% 
   summarise(Tleaf_max = max(Tleaf)) %>% 
-  mutate(TSM_Tcrit = 43.4 - Tleaf_max,
-         TSM_T50 = 49.6 - Tleaf_max) %>% 
+  mutate(TSM_Tcrit = 46.5 - Tleaf_max,
+         TSM_T50 = 50.4 - Tleaf_max) %>% 
   arrange(factor(Model, levels = c("Medlyn", "Sperry", 
                                    "Sperry + varkmax", "Sperry + CGnet", 
                                    "Sperry + CGnet + TC"))) %>% 

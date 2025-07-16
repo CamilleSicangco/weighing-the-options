@@ -14,28 +14,19 @@ source("R/functions/plotting_functions.R")
 environment(Photosyn_custom) <- asNamespace("plantecophys")
 assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
 
-# Replace calc_costgain to compute CGnet with netorig
-#environment(calc_costgain_corr) <- asNamespace("gsthermal")
-#assignInNamespace("calc_costgain", calc_costgain_corr, ns = "gsthermal")
-
-# Replace calc_A with correction
-#environment(calc_A_corr) <- asNamespace("gsthermal")
-#assignInNamespace("calc_A", calc_A_corr, ns = "gsthermal")
-
 # WTC DATA PROCESSING ##########################################################
 
 # Process WTC4 input data
-#source("R/processing/WTC4_data_processing.R")
-WTC4_data = read.csv("data/in/WTC4_data.csv") # Run to skip this step
+source("R/processing/WTC4_data_processing.R")
 
 # Fit Tcrit, T50
-source("R/processing/T50_fitting.R")
+source("R/processing/Tthreshold_fitting.R")
 
 # Fit R-T response
 source("R/processing/RT_fitting.R")
 
 # Fit A-Ci T response
-source("R/processing/ACi_T_fitting.R")
+source("R/processingACi_T_fitting.R")
 
 # ANALYSIS #####################################################################
 
@@ -52,6 +43,9 @@ source("R/analysis/inst_sims.R")
 source("R/analysis/Tthreshold_sensitivity.R")
 
 ## WTC simulations ---------------------
+# Calculate average T50 before, during, and after the heatwave
+source("R/analysis/T50_analysis.R")
+
 # Fit gs models to WTC4 data
 source("R/analysis/WTC_simulations.R")
 
