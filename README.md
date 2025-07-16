@@ -13,7 +13,7 @@ To regenerate our results, run `R/central_script.R`. This script will guide you 
 The models are evaluated against the dataset from Drake et al. (2018), "Trees tolerate an extreme heatwave via sustained transpirational cooling and increased leaf thermal tolerance". The data used for our analysis can be accessed freely at:
 
 * Fluxes, leaf temperatures, water potentials: [Drake et al. (2018)](http://doi.org/10.4225/35/5a36f61f150f3)
-* A-Ci T-response parameters: [PPC-TGlob_V1.0](https://bitbucket.org/Kumarathunge/aci-tglob/src/master/)
+* A-Ci T-response parameters: [PPC-TGlob_V1.0, Kumarathunge et al. (2019)](https://bitbucket.org/Kumarathunge/aci-tglob/src/master/)
 * Soil water content, raw Fv/Fm, R-T: [data/in/raw](https://github.com/CamilleSicangco/ThermalCost/tree/main/data/in)
 
 ## Contact
