@@ -338,6 +338,9 @@ plot_composite_Trange = function(outputs, vars = c("gs, A, Pleaf", "E, Dleaf")) 
   
   comb_plt = plot_grid(legend, comb_plt, nrow = 2, rel_heights = c(1,25)) +
     theme(plot.margin = margin(t = 10, r = 10, b = 10, l = 10))
+  comb_plt = annotate_figure(comb_plt, 
+                             bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), size = 16))
+  
   
   return(comb_plt)
 }
