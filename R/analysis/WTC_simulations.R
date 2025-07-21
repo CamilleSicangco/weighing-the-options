@@ -21,6 +21,8 @@ range(VPDs$maxVPD[VPDs$HWtrt == "HW"])
 # Subset the model predictions for the ambient treatment  
 control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 
+## Prescribed E ----------------------------------------------------------------
+
 # Test energy balance by prescribing E
 pred_prescE.c = prescribedE_pred(df = filter(control, !is.na(gs)))
 
@@ -54,7 +56,7 @@ gs_fits <- nls(gs ~ g0 + 1.6*(1+g1/sqrt(VPD))*(A/400),
                start=list(g0=0,g1=4),
                data=subset(WTC4_data,HWtrt=="C" & PPFD > 500),
                algorithm="port",
-               lower=c(0,0),upper=c(1e-9,10))
+               lower=c(0,0),upper=c(1e-5,10))
 coef(gs_fits)
 
 # Get gs model predictions
@@ -71,10 +73,10 @@ save(control, pred.c, file = "data/out/control_runs.Rdata")
 load("data/out/control_runs.Rdata")
 
 
-# Heatwave data ################################################################
+# Heatwave  ####################################################################
 
 # Subset the model predictions for the ambient treatment  
-heatwave <- subset(WTC4_data,HWtrt=="HW" & PPFD > 500)
+heatwave <- subset(WTC4_data,HWtrt=="HW" & PPFD > 500 & E >= 0)
 
 ## Prescribed E tests ---------------------------------------------------------- 
 pred_prescE.hw = prescribedE_pred(df = filter(heatwave, !is.na(gs)))
@@ -192,7 +194,7 @@ AEvT.plt =
   annotate_figure(AEvT.plt,
                   bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
 
-ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7)
+ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7, bg = "white")
 
 ## Figure 6: Tleaf predictions vs observations -------------------------
 
@@ -225,7 +227,7 @@ Tleaf_pred_obs.plt =
   annotate("text", x=T50, y = 10, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 5)+
   theme(plot.title = element_blank(),text = element_text(size = 14)) +  
   xlim(NA, 53)
-ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11)
+ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11, bg = "white")
 
 ## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
 
@@ -252,7 +254,7 @@ Fig7_PleafvT =
   annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
   theme(text = element_text(size = 16)) +
   ylim(NA,5.7)
-ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10)
+ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10, bg = "white")
 
 # Calculate TSM and HSM ########################################################
 

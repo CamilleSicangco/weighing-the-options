@@ -110,6 +110,8 @@ EDvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "E, Dlea
 
 # Save plots
 ggsave(gsAPleafvsTleaf_constVPD.plt,
-       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.tiff", width = 12.25, height = 10)
+       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.tiff", 
+       width = 12.25, height = 10, bg = "white")
 ggsave(EDvsTleaf_constVPD.plt,
-       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.tiff", width = 12.25, height = 6.5)
+       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.tiff", 
+       width = 12.25, height = 6.5, bg = "white")

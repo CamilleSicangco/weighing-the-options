@@ -24,7 +24,7 @@ FigS1 = data.frame(Tair = rep(Tair_vec, 2),
                           expression(italic("J")["peakedArr"])
                         )) +
   guides(linetype = guide_legend(title = expression("J"[max])))
-ggsave("figs/FigS1_JvsT.tiff", FigS1, height = 6, width = 10)
+ggsave("figs/FigS1_JvsT.tiff", FigS1, height = 6, width = 10, bg = "white")
 
 # Fig S2: Predawn time series ##################################################
 
@@ -78,7 +78,7 @@ FigS5 = data.frame(P, Ci = Ci_pred) %>%
   ylab(expression("C"[i]*" (ppm)")) +
   theme(text = element_text(size = 14)) +
   geom_hline(yintercept = 420, linetype = "dashed")
-ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6)
+ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6, bg = "white")
 
 # Fig S6: T50 sensitivity analysis #############################################
 

@@ -3,7 +3,8 @@
 # Created 30 Sept 2024
 
 # Make predictions with prescribed values of E
-prescribedE_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.86, Rd0 = 0.92, TrefR = 25,...)
+prescribedE_pred = function(df, Wind = 5, Wleaf = 0.025, LeafAbs=0.5, 
+                            Rd0 = 0.92, TrefR = 25,...)
 {
   Tleaf = try(calc_Tleaf(Tair = df$Tair, E = df$E, VPD = df$VPD, PPFD = df$PPFD, Wind = Wind, 
                      Wleaf = Wleaf, LeafAbs = LeafAbs))
@@ -36,7 +37,7 @@ prescribedE_pred = function(df, Wind = 8, Wleaf = 0.01, LeafAbs=0.86, Rd0 = 0.92
 make_pred = function(
     Tair, Ps, VPD, PPFD, 
     P50 = 4.07, P88 = 5.5,
-    Wind = 8,
+    Wind = 5,
     Wleaf = 0.025,
     LeafAbs=0.5,
     Tcrit = 46.5,
@@ -53,7 +54,7 @@ make_pred = function(
   b = Weibull[1,1]
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
-  P = Ps_to_Pcrit(Ps, Pcrit)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
   
   
   # Calculate costs and gains
@@ -169,7 +170,7 @@ calc_Pleaf0 = function(E, Ps, P50 = 4.07, P88 = 5.50) {
   b = Weibull[1,1]
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
-  P = Ps_to_Pcrit(Ps, Pcrit)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
   E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
   
   # Get corresponding Pleaf
@@ -696,7 +697,7 @@ fVJ.a<-as.formula(Jmax ~ k25 * exp((Ea*(TsK - 298.15))/(298.15*0.008314*TsK)))
 get_predictions = 
   function(
     df, Tcrit = 46.5, T50 = 50.4, P50 = 4.07, P88 = 5.50,
-    Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
+    Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
     kmax_25 = 0.5, #net = TRUE, netOrig = TRUE,
@@ -747,7 +748,7 @@ get_Pleaf_Medlyn = function(Ps, E, Tair, P50, P88, kmax_25, constant_kmax) {
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
   
-  P = Ps_to_Pcrit(Ps, Pcrit)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
   E_vec = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
   j = which.min(abs(E - E_vec))
   Pleaf = P[j]
@@ -757,7 +758,7 @@ get_Pleaf_Medlyn = function(Ps, E, Tair, P50, P88, kmax_25, constant_kmax) {
 
 
 # Make predictions with different Tcrit/T50 values
-make_pred_Tthresholds = function(df, Wind = 8, Wleaf = 0.025, LeafAbs=0.5,
+make_pred_Tthresholds = function(df, Wind = 5, Wleaf = 0.025, LeafAbs=0.5,
                                  hold_Tcrit = FALSE,
                                  Thold_val = 50.4,
                                  Tvar_vals = c(46.5, 47.5, 48.5, 49.5),

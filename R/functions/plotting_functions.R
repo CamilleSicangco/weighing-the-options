@@ -468,7 +468,8 @@ plot_AEvT_WTC = function(
     NULL
   } else {
     plotGAM(GAM, smooth.c = "Tcan") +
-      geom_point(data = df, aes(x = Tleaf, y = !!sym(yvar), color = Model), shape = 1, size = .5) +
+      geom_point(data = df, aes(x = Tleaf, y = !!sym(yvar), color = Model), #shape = 1, 
+                 size = .5, alpha = 0.3) +
       theme_classic() +
       scale_color_manual(
         values = palette,
@@ -481,7 +482,7 @@ plot_AEvT_WTC = function(
         )) +
       xlab(expression("T"[leaf]*" (\u00B0C)")) +
       ylab(ylabel) + 
-      guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
+      guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
              linetype = "none") +
       theme(plot.title = element_blank())
   }

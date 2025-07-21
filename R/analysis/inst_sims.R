@@ -20,7 +20,7 @@ b = Weibull[1,1]
 c = Weibull[1,2]
 kmax_25 = 0.5
 Pcrit = calc_Pcrit(b, c)
-P = Ps_to_Pcrit(Ps, Pcrit)
+P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
 
 # Plots ------------------------------------------------------------------------
 
@@ -34,7 +34,8 @@ cost_gain41 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 Fig2 = composite_plot(cost_gain41)
-ggsave(filename = "figs/Fig2_41deg_inst_sim.tiff", Fig2, width = 12.25, height = 6.5)
+ggsave(filename = "figs/Fig2_41deg_inst_sim.tiff", Fig2, 
+       width = 12.25, height = 6.5, bg = "white")
 
 # Tair = 48
 Tair = 48
@@ -47,7 +48,8 @@ cost_gain48 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 Fig3 = composite_plot(cost_gain48)
-ggsave(filename = "figs/Fig3_48deg_inst_sim.tiff", Fig3, width = 12.25, height = 6.5)
+ggsave(filename = "figs/Fig3_48deg_inst_sim.tiff", Fig3, 
+       width = 12.25, height = 6.5, bg = "white")
 
 # Tair = 30
 Tair = 30
@@ -60,4 +62,5 @@ cost_gain30 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 FigS4 = composite_plot(cost_gain30)
-ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", Fig3, width = 12.25, height = 6.5)
+ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", Fig3, 
+       width = 12.25, height = 6.5, bg = "white")

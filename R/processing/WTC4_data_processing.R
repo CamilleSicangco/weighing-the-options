@@ -178,3 +178,29 @@ WTC4_data$Ps[WTC4_data$chamber == "C11"] = max(WTC4_data$Ps[WTC4_data$chamber ==
 # Write csv of final data frame for analysis
 write.csv(WTC4_data, "data/in/WTC4_data.csv", row.names = FALSE)
 WTC4_data = read.csv("data/in/WTC4_data.csv")
+
+# Fit kmax
+WP_kmax = WP_df %>% filter(Phase == "baseline", tissue == "leaf") %>%
+  select(chamber, Date, Timing, LWP) %>%
+  group_by(chamber, Date, Timing) %>%
+  summarise(LWP = mean(LWP)) %>%
+  ungroup() %>%
+  pivot_wider(names_from = Timing, values_from = LWP) %>%
+  rename(P_MD = midday, P_PD = "pre-dawn")
+
+LeafArea_df = fluxes_df[1:12,] %>% select(chamber, LeafArea)
+
+E_kmax = fluxes_v3 %>% 
+  filter(linktime >= "2016-10-19 11:00:00" & linktime <= "2016-10-19 14:00:00") %>% 
+    left_join(LeafArea_df, by = "chamber") %>% 
+  select(chamber, FluxH2O, LeafArea, Tair) %>%
+  mutate(E = FluxH2O / LeafArea * 10^3) %>%
+  group_by(chamber) %>%
+  slice_max(E)
+
+kmax_df = WP_kmax %>%
+  mutate(E = E_kmax$E, Tair = E_kmax$Tair) %>%
+  mutate(kmax = E / (P_PD - P_MD)) %>%
+  select(chamber, kmax)
+
+write.csv(kmax_df, "data/in/kmax_values.csv", row.names = FALSE)
