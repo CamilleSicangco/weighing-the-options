@@ -26,6 +26,9 @@ control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 # Test energy balance by prescribing E
 pred_prescE.c = prescribedE_pred(df = filter(control, !is.na(gs)))
 
+plot(pred_prescE.hw$Tleaf.pred, pred_prescE.hw$E.obs, col = "blue")
+points(pred_prescE.hw$Tleaf.obs, pred_prescE.hw$E.obs, col = "orange")
+
 diff_long.c = pred_prescE.c %>% 
   select(ends_with(".diff")) %>%
   pivot_longer(cols = ends_with(".diff"), names_to = "var", values_to = "diff",
@@ -132,6 +135,11 @@ load("data/out/heatwave_runs.Rdata")
 
 # Plotting #####################################################################
 
+out.l$heatwave %>% filter(Model == "Sperry") %>% 
+  ggplot(aes(x = datetime, y = E, color = chamber)) + 
+  geom_point() +
+  theme_classic()
+
 ## Prep outputs ---------------------
 
 preds = list(list(control, pred.c), list(heatwave, pred.hw))
@@ -178,7 +186,6 @@ AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) +
                      AvT.hw + ylim(-2.5, 13) +
                        labs(title = "Heatwave",
                             subtitle = expression(bold("(b)"))) + 
-                       ggtitle("Heatwave") + 
                        theme(axis.title.y = element_blank(), 
                              axis.title.x = element_blank(), 
                              plot.title = element_text(hjust = 0.5)), 
@@ -255,6 +262,145 @@ Fig7_PleafvT =
   theme(text = element_text(size = 16)) +
   ylim(NA,5.7)
 ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10, bg = "white")
+
+## E vs Tleaf -----------
+out.l$heatwave %>% 
+  filter(Model %in% c("observed", "Sperry", "Sperry + varkmax")) %>%
+  ggplot(aes(x = Dleaf, y = E, color = Model)) +
+geom_point(#size = .5, 
+           alpha = 0.3) +
+  theme_classic() +
+  scale_color_manual(
+    values = palette,
+    labels = c("Observations",
+               "ProfitMax",
+               expression("ProfitMax"[k[max](T)])
+    )) +
+  xlab(expression("D"[leaf]*" (kPa)")) +
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
+         linetype = "none") +
+  theme(plot.title = element_blank())
+
+## gs vs Tleaf -----------
+
+# GAMs
+gam_gs.hw = gam(gs ~ s(Tcan), data = heatwave)
+gam_gs.c = gam(gs ~ s(Tcan), data = control)
+
+gs_vs_Tleaf.hw = plot_AEvT_WTC(gam_gs.hw, out.l$heatwave, "gs")
+gs_vs_Tleaf.c = plot_AEvT_WTC(gam_gs.c, out.l$control, "gs")
+
+gs_vs_Tleaf.plt = 
+  ggarrange(gs_vs_Tleaf.c + #ylim(-2.5, 13) + 
+              ggtitle(expression(bold("(a)")*" Control")) + 
+              theme(axis.title.x = element_blank(), 
+                    plot.title = element_text(hjust = 0)), 
+            gs_vs_Tleaf.hw + #ylim(-2.5, 13) +
+              ggtitle(expression(bold("(b)")*" Heatwave")) +
+              theme(axis.title.y = element_blank(), 
+                    axis.title.x = element_blank(), 
+                    plot.title = element_text(hjust = 0)), 
+            nrow = 1, ncol = 2, common.legend = TRUE, legend = "right")
+
+gs_vs_Tleaf.plt = annotate_figure(gs_vs_Tleaf.plt,
+                bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
+
+ggsave(plot = gs_vs_Tleaf.plt, filename = "figs/FigS7_gs_vs_Tleaf.tiff", width = 11, height = 6, bg = "white")
+
+## Time series of A, E -----------
+
+plt_timeseries = function(df,
+                          heatwave = TRUE,
+                          yvar = c("E", "A", "gs")) {
+  palette = c(Sperry = "#1E88E5", "Sperry + varkmax" = "#332288", "Sperry + CGnet" = "#e7d87d", "Sperry + CGnet + TC" = "orange", 
+              Medlyn = "#D81B60", observed = "grey50")
+  
+  ylabel = 
+    if (yvar == "gs") {
+      expression("g"[s]*" (mol m"^-2*"s"^-1*")")
+    } else if (yvar == "P") {
+      expression(psi[leaf]*" (-MPa)")
+    } else if (yvar == "Tleaf") {
+      expression("T"[leaf]*" (\u00B0C)")
+    } else if (yvar == "A") {
+      expression("A (" * mu * "mol m"^-2*"s"^-1*")")
+    } else if (yvar == "Dleaf") {
+      expression("VPD"[leaf]*" (kPa)")
+    } else if (yvar == "E") {
+      expression("E"*" (mmol m"^-2*"s"^-1*")")
+    }
+  
+  plt = df %>% 
+    ggplot() +
+    geom_point(aes(x = datetime, y = !!sym(yvar), color = Model), alpha = 0.3, size = 0.5) +
+    theme_classic() +
+    scale_color_manual(
+      values = palette,
+      labels = c("Observations",
+                 "USO",
+                 "ProfitMax",
+                 expression("ProfitMax"[k[max](T)]),
+                 expression("ProfitMax"[net]),
+                 expression("ProfitMax"[TC])
+      )) +
+    guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
+           linetype = "none") +
+    ylab(ylabel) +
+    xlab("Date") 
+  
+  if(isTRUE(heatwave)) {
+    plt = plt +
+      annotate("rect",
+               xmin = as.POSIXct("2016-10-31", tz = "GMT"),
+               xmax = as.POSIXct("2016-11-04", tz = "GMT"),
+               ymin = -Inf,
+               ymax = Inf,
+               alpha = 0.2, fill = "red") 
+  }
+  
+  return(plt)
+}
+
+yvars = c("A", "E", "gs")
+timeseries.c = lapply(yvars, function(yvar) plt_timeseries(df =out.l$control, heatwave = FALSE, yvar))
+timeseries.hw = lapply(yvars, function(yvar) plt_timeseries(df =out.l$heatwave, heatwave = TRUE, yvar))
+
+# Create composite plot
+legend = cowplot::get_legend(timeseries.c[[1]])
+aligned_plots = cowplot::align_plots(timeseries.c[[1]] + ggpubr::rremove("xlab") +
+                                       labs(title = "Control",
+                                            subtitle = expression(bold("(a)"))) + 
+                                       theme(axis.title.x = element_blank(), 
+                                             plot.title = element_text(hjust = 0.5),
+                                             legend.position = "none"), 
+                                     timeseries.c[[2]] + ggpubr::rremove("xlab") + theme(legend.position = "none", plot.title = element_text(face = "bold", hjust = 0, vjust = 5)) + ggtitle(bquote(bold("(b)"))),
+                                     timeseries.c[[3]] + ggpubr::rremove("xlab") + theme(legend.position = "none", plot.title = element_text(face = "bold", hjust = 0, vjust = 5)) + ggtitle(bquote(bold("(c)"))),
+                                     timeseries.hw[[1]] + ggpubr::rremove("xlab") + ggpubr::rremove("ylab") +
+                                       labs(title = "Heatwave",
+                                            subtitle = expression(bold("(d)"))) + 
+                                       theme(axis.title.x = element_blank(), 
+                                             plot.title = element_text(hjust = 0.5),
+                                             legend.position = "none"),
+                                     timeseries.hw[[2]] + ggpubr::rremove("xlab") + ggpubr::rremove("ylab") + theme(legend.position = "none", plot.title = element_text(face = "bold", hjust = 0, vjust = 5)) + ggtitle(bquote(bold("(e)"))),
+                                     timeseries.hw[[3]] + ggpubr::rremove("xlab") + ggpubr::rremove("ylab") + theme(legend.position = "none", plot.title = element_text(face = "bold", hjust = 0, vjust = 5)) + ggtitle(bquote(bold("(f)"))),
+                                     align = "v", axis = "l")
+plt_comp = cowplot::plot_grid(aligned_plots[[1]],
+                              aligned_plots[[2]],
+                              aligned_plots[[3]],
+                              aligned_plots[[4]],
+                              aligned_plots[[5]],
+                              aligned_plots[[6]],
+                              nrow = 3, ncol = 2, byrow = FALSE,
+                              rel_heights = c(1, 0.75, 0.75, 1, 0.75, 0.75))
+plt_comp = ggpubr::annotate_figure(plt_comp, 
+                                   bottom = "Date")
+aligned_plts2 = cowplot::align_plots(plt_comp, legend, align = "h", axis = "t")
+timeseries.plt = cowplot::plot_grid(aligned_plts2[[1]], aligned_plts2[[2]],
+                         rel_widths = c(1,0.2))
+timeseries.plt
+
+ggsave(plot = timeseries.plt, filename = "figs/FigS8_timeseries.tiff", width = 11, height = 7, bg = "white")
+
 
 # Calculate TSM and HSM ########################################################
 

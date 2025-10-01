@@ -4,6 +4,9 @@
 
 # SETUP ########################################################################
 
+# Run once to install gsthermal package
+#devtools::install_github("https://github.com/CamilleSicangco/gsthermal")
+
 # Load packages and functions
 source("R/load_packages.R")
 source("R/functions/data_processing_functions.R")
