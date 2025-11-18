@@ -10,9 +10,13 @@ Tair_vec = seq(20,60, by = 1)
 PPFD = 1500
 VPD = 1.5
 
+# Medlyn model: fit b
+b_USO = log(((0.05 - 1e-5)/1.6*400/5.89 - 1) * sqrt(1.5) / 2.9)/(-0.5 + 0.2)
+g1_alt = ((0.05 - 1e-5)/1.6*400/5.89 - 1)*sqrt(1.5) / exp(0.55*(-0.5 + 0.3))
+
 # Ps = -0.5 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
-out_Ps0.5_constVPD = get_predictions(Tair_sim.df)
+out_Ps0.5_constVPD = get_predictions(Tair_sim.df, g1 = g1_alt)
 test = get_predictions(Tair_sim.df, kmax_25 = 2)
 test = make_pred(kmax_25 = 4, Ps = 0.5,
                  Tair = 30, PPFD = PPFD, VPD = VPD,
@@ -24,11 +28,11 @@ test$E*(pi * (3.25*3/8)^2)/LeafArea_df$LeafArea
   
 # Ps = -2 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 2)
-out_Ps2_constVPD = get_predictions(Tair_sim.df)
+out_Ps2_constVPD = get_predictions(Tair_sim.df, g1 = g1_alt)
 
 # Ps = -4 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 4)
-out_Ps4_constVPD = get_predictions(Tair_sim.df)
+out_Ps4_constVPD = get_predictions(Tair_sim.df, g1 = g1_alt)
 
 save(out_Ps0.5_constVPD, out_Ps2_constVPD, out_Ps4_constVPD, 
      file = "data/out/theoretical_sims_constVPD.Rdata")
@@ -40,7 +44,7 @@ VPD = RHtoVPD(RH = 60, TdegC = Tair_vec)
 
 # Ps = -0.5 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
-out_Ps0.5_constRH = get_predictions(Tair_sim.df)
+out_Ps0.5_constRH = get_predictions(Tair_sim.df, g1 = g1_alt)
 
 test= get_predictions(Tair_sim.df, kmax_25 = 4)
 test$E0 = test$E
@@ -51,15 +55,15 @@ plot_physio_vs_Tleaf(test, all = FALSE, yvar = "E") # Leaf area basis
 plot_physio_vs_Tleaf(filter(test, Model == "Sperry"), all = FALSE, yvar = "E") # Canopy area basis
 
 test2= get_predictions(Tair_sim.df, kmax_25 = 0.5)
-plot_physio_vs_Tleaf(test, all = FALSE, yvar = "E")
+plot_physio_vs_Tleaf(out_Ps0.5_constRH_newb, all = FALSE, yvar = "E")
 
 # Ps = -2 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 2)
-out_Ps2_constRH = get_predictions(Tair_sim.df)
+out_Ps2_constRH = get_predictions(Tair_sim.df, g1 = g1_alt)
 
 # Ps = -4 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 4)
-out_Ps4_constRH = get_predictions(Tair_sim.df)
+out_Ps4_constRH = get_predictions(Tair_sim.df, g1 = g1_alt)
 
 save(out_Ps0.5_constRH, out_Ps2_constRH, out_Ps4_constRH, 
      file = "data/out/theoretical_sims_constRH.Rdata")

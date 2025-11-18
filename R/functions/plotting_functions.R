@@ -455,7 +455,7 @@ plot_AEvT_WTC = function(
     } else if (yvar == "A") {
       expression("A (" * mu * "mol m"^-2*"s"^-1*")")
     } else if (yvar == "gs") {
-      expression("g"[canopy]*" (mol m"^-2*"s"^-1*")")
+      expression("g"[s]*" (mol m"^-2*"s"^-1*")")
     } else if (yvar == "Pleaf") {
       expression(psi[leaf]*" (-MPa)")
     } else if (yvar == "Tleaf") {

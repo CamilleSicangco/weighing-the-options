@@ -55,7 +55,8 @@ gam_E.c = gam(E ~ s(Tcan), data = control)
 gam_A.c = gam(A ~ s(Tcan), data = control)
 
 # Medlyn model: fit g1 and g0
-gs_fits <- nls(gs ~ g0 + 1.6*(1+g1/sqrt(VPD))*(A/400),
+b_USO = 0.55
+gs_fits <- nls(gs ~ g0 + 1.6*(1+(g1* exp(b_USO * (-Ps + 0.2)))/sqrt(VPD))*(A/400),
                start=list(g0=0,g1=4),
                data=subset(WTC4_data,HWtrt=="C" & PPFD > 500),
                algorithm="port",
@@ -64,6 +65,7 @@ coef(gs_fits)
 
 # Get gs model predictions
 pred.c = get_predictions(df = control, b_USO = 0, Tcrit = 43.7, T50 = 48.6)
+pred.c_new = get_predictions(df = control, b_USO = 0, g1 = 2.37, Tcrit = 43.7, T50 = 48.6)
 
 pred.c$Tdiff <- with(pred.c,Tleaf-Tair)
 
