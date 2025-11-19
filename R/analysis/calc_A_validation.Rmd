@@ -1,0 +1,131 @@
+---
+title: "Verification of A calculations"
+author: "Camille K. Sicangco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## System of equations
+
+Version of calc_A that outputs Ci
+
+```{r calc_A}
+calc_A_and_Ci = function(Tair = 25,
+                  VPD = 1.5,
+                  PPFD = 1000,
+                  Patm = 101.325,
+                  E = 2,
+                  Wind = 5,
+                  Wleaf = 0.025,
+                  LeafAbs = 0.5,
+                  Ca = 400,
+                  Jmax = 100,
+                  Vcmax = 50,
+                  net = FALSE,
+                  Rd0 = 0.92,
+                  TrefR = 25,
+                  netOrig = TRUE,
+                  g1 = 2.9,
+                  g0 = 0.003,
+                  g_w = NULL,
+                  Tleaf = NULL,
+                  ...
+)
+{
+  if (is.null(g_w) & is.null(Tleaf)) {
+    Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD,
+                       E = E, Wind = Wind, Patm = Patm, Wleaf = Wleaf,
+                       LeafAbs = LeafAbs)
+    g_w = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind,
+                  Wleaf)
+  }
+
+  # Get leaf VPD
+  Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
+
+  if (net == FALSE) {
+    Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                          Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                          GS = g_w, Rd = 0, Jmax = Jmax, Vcmax = Vcmax, g1 = g1,
+                          g0 = g0, ...)
+    Anet = as.numeric(Photosyn_out[2, ])
+    Rd = as.numeric(Photosyn_out[8, ])
+    A = Anet + Rd
+  }
+  else {
+    if (isTRUE(netOrig)) {
+      Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                            GS = g_w, Jmax = Jmax, Vcmax = Vcmax, g1 = g1,
+                            g0 = g0, ...)
+      A = as.numeric(Photosyn_out[2, ])
+    }
+    else {
+      Rd = Rd0 * exp(0.1012 * (Tleaf - TrefR) - 5e-04 *
+                       (Tleaf^2 - TrefR^2))
+      Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                            GS = g_w, Rd = 0, Jmax = Jmax, Vcmax = Vcmax,
+                            g1 = g1, g0 = g0, ...)
+      A = as.numeric(Photosyn_out[2, ]) - Rd
+    }
+  }
+  Ci = as.numeric(Photosyn_out[1, ])
+  
+  out = list(A,Ci)
+  return(out)
+}
+```
+
+
+``` {r set_vars}
+# Environment
+Tair = 46
+Ps = 0.5
+VPD = RHtoVPD(RH = 60, Tair)
+PPFD = 1500
+Patm = 101.325
+Wind = 5
+
+# Leaf width
+Wleaf = 0.025
+
+# Thermal damage
+Tcrit = 46.5
+T50 = 50.4
+
+# Hydraulics
+Weibull = fit_Weibull(P50 = 4.47, P88 = 5.50)
+b = Weibull[1,1]
+c = Weibull[1,2]
+kmax_25 = 0.5
+Pcrit = calc_Pcrit(b, c)
+P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
+```
+
+``` {r calculations}
+E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
+
+Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD, E = E)
+g_w = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind, Wleaf)
+
+A_Ci_FvCB = calc_A_and_Ci(Tair, VPD, PPFD, E = E, net = TRUE, netOrig = TRUE, Ca = 400, Wind = Wind, Wleaf = Wleaf)
+
+A_FvCB = unlist(A_Ci_FvCB[1])
+Ci_FvCB = unlist(A_Ci_FvCB[2])
+
+A_Ficks = g_w/1.57*(400 - Ci_FvCB)
+Ci_Ficks = 400 - A_FvCB * 1E-4 / (g_w/1.57) * 100^2
+
+head(A_FvCB)
+head(A_Ficks)
+plot(A_FvCB[-1], A_Ficks[-1])
+
+head(Ci_FvCB)
+head(Ci_Ficks)
+plot(Ci_FvCB[-1], Ci_Ficks[-1])
+```

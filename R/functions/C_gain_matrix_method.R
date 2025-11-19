@@ -1,7 +1,7 @@
 # Modified C gain functions
 
 # Manon/Venturas implementation
-C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
+C_gain_alt_new = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25, 
                        VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 2, Wleaf = 0.01, 
                        LeafAbs = 0.5, Ca = 420, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
                        Rd0 = 0.92, TrefR = 25, net = TRUE, ...) 
@@ -31,7 +31,7 @@ C_gain_alt = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair = 25,
                         Ca = Ca, PPFD = PPFD, Tleaf = Tleaves, 
                         Patm = Patm, 
                         Ci = Cis, Jmax = Jmax, Vcmax = Vcmax,
-                        Rd0 = Rd0, TrefR = TrefR, new_JT = FALSE,
+                        Rd0 = Rd0, TrefR = TrefR,
                         ...)
   
   if (isTRUE(net)) {
