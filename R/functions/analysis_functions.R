@@ -54,7 +54,7 @@ make_pred = function(
   b = Weibull[1,1]
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
-  P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 500)
   
   
   # Calculate costs and gains
@@ -185,7 +185,7 @@ Photosyn_custom <- function(VPD=1.5,
                      Ca=400, 
                      PPFD=1500,
                      Tleaf=25,
-                     Patm=100,
+                     Patm=101.325,
                      RH=NULL,
                      
                      gsmodel=c("BBOpti","BBLeuning","BallBerry","BBdefine"),
@@ -329,7 +329,20 @@ Photosyn_custom <- function(VPD=1.5,
   
   if(inputGS){
     
-    GC <- GS / GCtoGW
+    # Convert stomatal conductance to water vapor -> carbon
+    Gsc <- GS / GCtoGW
+    
+    # Calculate boundary layer conductance
+    Tair_k <- Tair + 273.15
+    CMOLAR <- Patm * 1000/(8.314 * Tair_k)
+    Gbhforced <- 0.003 * sqrt(Wind/Wleaf) * CMOLAR
+    GRASHOF <- 1.6e+08 * abs(Tleaf - Tair) * (Wleaf^3)
+    Gbhfree <- 0.5 * DHEAT * (GRASHOF^0.25)/Wleaf * CMOLAR
+    Gbh <- 2 * (Gbhfree + Gbhforced)
+    Gbw = GbH / 0.93
+    Gbc <- Gbw / 1.37 # Aphalo and Jarvis 1993
+    
+    GC = (Gsc * Gbc) / (Gsc + Gbc)
     
     if(GS > 0){
       
