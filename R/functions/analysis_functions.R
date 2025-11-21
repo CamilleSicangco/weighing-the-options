@@ -333,16 +333,19 @@ Photosyn_custom <- function(VPD=1.5,
     Gsc <- GS / GCtoGW
     
     # Calculate boundary layer conductance
+    DHEAT <- 2.15e-05
     Tair_k <- Tair + 273.15
     CMOLAR <- Patm * 1000/(8.314 * Tair_k)
     Gbhforced <- 0.003 * sqrt(Wind/Wleaf) * CMOLAR
     GRASHOF <- 1.6e+08 * abs(Tleaf - Tair) * (Wleaf^3)
     Gbhfree <- 0.5 * DHEAT * (GRASHOF^0.25)/Wleaf * CMOLAR
     Gbh <- 2 * (Gbhfree + Gbhforced)
-    Gbw = GbH / 0.93
+    Gbw = Gbh / 0.93
     Gbc <- Gbw / 1.37 # Aphalo and Jarvis 1993
     
     GC = (Gsc * Gbc) / (Gsc + Gbc)
+    
+    #GC = Gsc
     
     if(GS > 0){
       
