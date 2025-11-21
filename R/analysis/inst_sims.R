@@ -30,14 +30,14 @@ VPD = RHtoVPD(RH = 60, Tair)
 cost_gain41 = calc_costgain(P, b, c, kmax_25 = kmax_25, 
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
-                            Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
+                            Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
                             Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
 test = calc_costgain(P, b, c, kmax_25 = 4, 
                      Tair = Tair, PPFD = PPFD, VPD = VPD,
                      Tcrit = Tcrit, T50 = T50,
-                     Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
+                     Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
                      Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                      Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
@@ -52,7 +52,7 @@ VPD = RHtoVPD(RH = 60, Tair)
 cost_gain48 = calc_costgain(P, b, c, kmax_25 = kmax_25, 
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
-                            Wind = 8, Wleaf = 0.02, LeafAbs = 0.5,
+                            Wind = 5, Wleaf = 0.02, LeafAbs = 0.5,
                             Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
@@ -66,7 +66,7 @@ VPD = RHtoVPD(RH = 60, Tair)
 cost_gain30 = calc_costgain(P, b, c, kmax_25 = kmax_25, 
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
-                            Wind = 8, Wleaf = 0.02, LeafAbs = 0.5,
+                            Wind = 5, Wleaf = 0.02, LeafAbs = 0.5,
                             Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
