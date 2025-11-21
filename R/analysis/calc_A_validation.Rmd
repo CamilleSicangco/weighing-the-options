@@ -7,11 +7,22 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+# Load packages and functions
+library(here)
+source(here("R/load_packages.R"))
+source(here("R/functions/data_processing_functions.R"))
+source(here("R/functions/analysis_functions.R"))
+source(here("R/functions/plotting_functions.R"))
+
+# Replace plantecophys::Photosyn with custom version to use the Heskel et al. 2017 R(T) equation
+environment(Photosyn_custom) <- asNamespace("plantecophys")
+assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
 ```
 
 ## System of equations
 
-Version of calc_A that outputs Ci
+First I define a version of the `calc_A` function that also outputs the value of Ci. This function is otherwise identical to `calc_A`.
 
 ```{r calc_A}
 calc_A_and_Ci = function(Tair = 25,
@@ -45,7 +56,7 @@ calc_A_and_Ci = function(Tair = 25,
   }
 
   # Get leaf VPD
-  Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
+  Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD, Pa = Patm)
 
   if (net == FALSE) {
     Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
@@ -76,15 +87,17 @@ calc_A_and_Ci = function(Tair = 25,
   }
   Ci = as.numeric(Photosyn_out[1, ])
   
-  out = list(A,Ci)
+  out = list(A,Ci, g_w)
   return(out)
 }
 ```
 
+Next we set up the environmental variables and physiological parameters.
 
 ``` {r set_vars}
 # Environment
 Tair = 46
+Ca = 400
 Ps = 0.5
 VPD = RHtoVPD(RH = 60, Tair)
 PPFD = 1500
@@ -93,10 +106,6 @@ Wind = 5
 
 # Leaf width
 Wleaf = 0.025
-
-# Thermal damage
-Tcrit = 46.5
-T50 = 50.4
 
 # Hydraulics
 Weibull = fit_Weibull(P50 = 4.47, P88 = 5.50)
@@ -107,19 +116,24 @@ Pcrit = calc_Pcrit(b, c)
 P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
 ```
 
+Now we calculate the transpiration supply stream and the associated values of Tleaf, gs, A, and Ci.
 ``` {r calculations}
 E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax = TRUE)
 
-Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD, E = E)
+Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD,
+                       E = E, Wind = Wind, Patm = Patm, Wleaf = Wleaf)
 g_w = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind, Wleaf)
 
-A_Ci_FvCB = calc_A_and_Ci(Tair, VPD, PPFD, E = E, net = TRUE, netOrig = TRUE, Ca = 400, Wind = Wind, Wleaf = Wleaf)
+A_Ci_FvCB = calc_A_and_Ci(Tair, VPD, PPFD, E = E, net = TRUE, netOrig = TRUE, Ca = Ca, Wind = Wind, Wleaf = Wleaf)
+```
 
+To verify whether the system of equations is closed, we check if A and Ci from Fick's Law match A and Ci from FvCB (calculated above).
+``` {r Ficks}
 A_FvCB = unlist(A_Ci_FvCB[1])
 Ci_FvCB = unlist(A_Ci_FvCB[2])
 
-A_Ficks = g_w/1.57*(400 - Ci_FvCB)
-Ci_Ficks = 400 - A_FvCB * 1E-4 / (g_w/1.57) * 100^2
+A_Ficks = g_w/1.57*(Ca - Ci_FvCB)
+Ci_Ficks = Ca - A_FvCB * 1E-4 / (g_w/1.57) * 100^2
 
 head(A_FvCB)
 head(A_Ficks)

@@ -17,14 +17,6 @@ g1_alt = ((0.05 - 1e-5)/1.6*400/5.89 - 1)*sqrt(1.5) / exp(0.55*(-0.5 + 0.3))
 # Ps = -0.5 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
 out_Ps0.5_constVPD = get_predictions(Tair_sim.df, g1 = g1_alt)
-test = get_predictions(Tair_sim.df, kmax_25 = 2)
-test = make_pred(kmax_25 = 4, Ps = 0.5,
-                 Tair = 30, PPFD = PPFD, VPD = VPD,
-                 Tcrit = Tcrit, T50 = T50,
-                 Wind = 8, Wleaf = 0.025, LeafAbs = 0.5,
-                 Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                 Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
-test$E*(pi * (3.25*3/8)^2)/LeafArea_df$LeafArea
   
 # Ps = -2 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 2)
