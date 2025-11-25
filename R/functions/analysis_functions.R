@@ -15,7 +15,7 @@ prescribedE_pred = function(df, Wind = 5, Wleaf = 0.025, LeafAbs=0.5,
   gs = try(calc_gw(E = df$E, Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD, 
                    PPFD = df$PPFD, Wind = Wind, Wleaf = Wleaf))
   Agr =  mapply(plantecophys::Photosyn, VPD = df$VPD, 
-              Ca = 400, PPFD = df$PPFD, Tleaf = df$Tcan,  
+              Ca = 400, PPFD = df$PPFD, Tleaf = df$Tcan, Tair = df$Tair,
               GS = gs,
               Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
               Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Rd0 = 0)
@@ -233,7 +233,9 @@ Photosyn_custom <- function(VPD=1.5,
                      new_JT = TRUE,
                      
                      b_USO = 0.55, # sensitivity of g1 to SWP
-                     Ps = 0.5 # soil water potential, -MPa
+                     Ps = 0.5, # soil water potential, -MPa
+                     
+                     Tair = 25 # deg C
                      ){
   
   
