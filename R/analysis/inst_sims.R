@@ -64,5 +64,5 @@ cost_gain30 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 FigS4 = composite_plot(cost_gain30)
-ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", Fig3, 
+ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", FigS4, 
        width = 12.25, height = 6.5, bg = "white")

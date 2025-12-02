@@ -98,11 +98,10 @@ Tleaves.hw[grep("Error", Tleaves.hw)] = NA
 Tleaves.hw = as.numeric(Tleaves.hw)
 
 # Tends to over-predict leaf temperature slightly
-Tdiff.hw = Tleaves.hw - heatwave$Tleaf
+Tdiff.hw = Tleaves.hw - heatwave$Tcan
 summary(Tdiff.hw)
 hist(Tdiff.hw)
-plot(x = heatwave$Tleaf, y = Tdiff.hw, col = "deeppink")
-points(x = heatwave$Tcan, y = Tleaves.hw - heatwave$Tcan)
+plot(x = heatwave$Tcan, y = Tdiff.hw, col = "deeppink")
 abline(h = 0, col = "blue")
 
 ## Fitting ---------------------------------------------------------------------
@@ -123,11 +122,6 @@ save(heatwave, pred.hw, file = "data/out/heatwave_runs.Rdata")
 load("data/out/heatwave_runs.Rdata")
 
 # Plotting #####################################################################
-
-out.l$heatwave %>% filter(Model == "Sperry") %>% 
-  ggplot(aes(x = datetime, y = E, color = chamber)) + 
-  geom_point() +
-  theme_classic()
 
 ## Prep outputs ---------------------
 
