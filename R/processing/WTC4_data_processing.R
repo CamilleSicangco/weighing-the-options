@@ -79,9 +79,11 @@ fluxes_df = fluxes_df %>% dplyr::select(!TargTempC_Avg)
 
 fluxes_df$Tdiff <- with(fluxes_df,Tcan-Tair)
 
-# Calculate conductance as the simple ratio between Trans and VPD. But use leaf to air VPD. Leaf to air VPD tends to be greater than air VPD, as leaves tend to be warmer than air. Plot the relationships between photosynthesis, conductance, and leaftoairVPD. Note the shift in points at extreme temperatures and VPD in teh heatwave treatment, consistent with lower photosynthesis than would be expected given the measured gs.
+# Calculate conductance with Penman-Monteith
+fluxes_df$gs = calc_gw(E = fluxes_df$E, Tleaf = fluxes_df$Tcan,
+                       Tair = fluxes_df$Tair, VPD = fluxes_df$VPD,
+                       PPFD = fluxes_df$PPFD)
 fluxes_df$Dleaf <- VPDairToLeaf(VPD=fluxes_df$VPD,Tair=fluxes_df$Tair,Tleaf=fluxes_df$Tcan)
-fluxes_df$gs <- fluxes_df$E/fluxes_df$Dleaf/10
 fluxes_df$Atogs <- with(fluxes_df,A/(gs*1000))
 
 # Aggregate to hourly averages
