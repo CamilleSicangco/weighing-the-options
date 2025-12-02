@@ -135,18 +135,3 @@ WP_kmax = WP_df %>% filter(Phase == "baseline", tissue == "leaf") %>%
   rename(P_MD = midday, P_PD = "pre-dawn")
 
 LeafArea_df = fluxes_df[1:12,] %>% select(chamber, LeafArea)
-
-E_kmax = fluxes_v3 %>% 
-  filter(linktime >= "2016-10-19 11:00:00" & linktime <= "2016-10-19 14:00:00") %>% 
-    left_join(LeafArea_df, by = "chamber") %>% 
-  select(chamber, FluxH2O, LeafArea, Tair) %>%
-  mutate(E = FluxH2O / LeafArea * 10^3) %>%
-  group_by(chamber) %>%
-  slice_max(E)
-
-kmax_df = WP_kmax %>%
-  mutate(E = E_kmax$E, Tair = E_kmax$Tair) %>%
-  mutate(kmax = E / (P_PD - P_MD)) %>%
-  select(chamber, kmax)
-
-write.csv(kmax_df, "data/in/kmax_values.csv", row.names = FALSE)
