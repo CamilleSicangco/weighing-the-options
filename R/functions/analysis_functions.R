@@ -235,7 +235,9 @@ Photosyn_custom <- function(VPD=1.5,
                      b_USO = 0.55, # sensitivity of g1 to SWP
                      Ps = 0.5, # soil water potential, -MPa
                      
-                     Tair = 25 # deg C
+                     Tair = 25, # deg C
+                     Wind = 5, # Wind speed, m/s
+                     Wleaf = 0.025 # Leaf width, m
                      ){
   
   

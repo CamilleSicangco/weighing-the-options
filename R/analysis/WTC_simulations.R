@@ -26,9 +26,6 @@ control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 # Test energy balance by prescribing E
 pred_prescE.c = prescribedE_pred(df = filter(control, !is.na(gs)))
 
-plot(pred_prescE.hw$Tleaf.pred, pred_prescE.hw$E.obs, col = "blue")
-points(pred_prescE.hw$Tleaf.obs, pred_prescE.hw$E.obs, col = "orange")
-
 diff_long.c = pred_prescE.c %>% 
   select(ends_with(".diff")) %>%
   pivot_longer(cols = ends_with(".diff"), names_to = "var", values_to = "diff",

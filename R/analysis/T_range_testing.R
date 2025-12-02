@@ -38,17 +38,6 @@ VPD = RHtoVPD(RH = 60, TdegC = Tair_vec)
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
 out_Ps0.5_constRH = get_predictions(Tair_sim.df, g1 = g1_alt)
 
-test= get_predictions(Tair_sim.df, kmax_25 = 4)
-test$E0 = test$E
-test$E = test$E0*(pi * (3.25*3/8)^2)/mean(LeafArea_df$LeafArea)
-calc_kmax(0.5, 40) * mean(LeafArea_df$LeafArea)/(pi * (3.25*3/8)^2)
-6*(pi * (3.25*3/8)^2)/mean(LeafArea_df$LeafArea)
-plot_physio_vs_Tleaf(test, all = FALSE, yvar = "E") # Leaf area basis
-plot_physio_vs_Tleaf(filter(test, Model == "Sperry"), all = FALSE, yvar = "E") # Canopy area basis
-
-test2= get_predictions(Tair_sim.df, kmax_25 = 0.5)
-plot_physio_vs_Tleaf(out_Ps0.5_constRH_newb, all = FALSE, yvar = "E")
-
 # Ps = -2 MPa
 Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 2)
 out_Ps2_constRH = get_predictions(Tair_sim.df, g1 = g1_alt)

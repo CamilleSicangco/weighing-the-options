@@ -25,25 +25,18 @@ P = Ps_to_Pcrit(Ps, Pcrit, pts = 600)
 # Plots ------------------------------------------------------------------------
 
 # Tair = 40
-Tair = 41
+Tair = 40
 VPD = RHtoVPD(RH = 60, Tair)
-cost_gain41 = calc_costgain(P, b, c, kmax_25 = kmax_25, 
+cost_gain40 = calc_costgain(P, b, c, kmax_25 = kmax_25, 
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
                             Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
                             Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
-test = calc_costgain(P, b, c, kmax_25 = 4, 
-                     Tair = Tair, PPFD = PPFD, VPD = VPD,
-                     Tcrit = Tcrit, T50 = T50,
-                     Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
-                     Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                     Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
-
-Fig2 = composite_plot(cost_gain41)
-ggsave(filename = "figs/Fig2_41deg_inst_sim.tiff", Fig2, 
+Fig2 = composite_plot(cost_gain40)
+ggsave(filename = "figs/Fig2_40deg_inst_sim.tiff", Fig2, 
        width = 12.25, height = 6.5, bg = "white")
 
 # Tair = 48
