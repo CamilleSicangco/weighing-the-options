@@ -113,6 +113,7 @@ gam_A.hw = gam(A ~ s(Tcan), data = heatwave)
 # Get gs model predictions
 pred.hw = get_predictions(df = heatwave, b_USO = 0)
 
+ 
 # Check if any model predicts negative gs values
 sapply(unique(pred.hw$Model), 
        function(model) table(pred.hw$gs[pred.hw$Model == model] >= 0)) # all predict positive gs
@@ -125,7 +126,7 @@ load("data/out/heatwave_runs.Rdata")
 
 ## Prep outputs ---------------------
 
-preds = list(list(control, pred.c), list(heatwave, pred.hw))
+preds = list(list(control, pred.c), list(heatwave, pred.hw_DKparams))
 out.l = lapply(preds, function(ls) {
   out = data.frame(datetime = c(ls[[1]]$DateTime_hr, rep(ls[[1]]$DateTime_hr, each = 4), 
                                 ls[[1]]$DateTime_hr),
@@ -158,7 +159,7 @@ palette = c(Sperry = "#1E88E5", "Sperry + varkmax" = "#332288", "Sperry + CGnet"
 EvT.c = plot_AEvT_WTC(gam_E.c, out.l$control, "E")
 AvT.c = plot_AEvT_WTC(gam_A.c, out.l$control, "A")
 EvT.hw = plot_AEvT_WTC(gam_E.hw, out.l$heatwave, "E")
-AvT.hw = plot_AEvT_WTC(gam_A.c, out.l$heatwave, "A")
+AvT.hw = plot_AEvT_WTC(gam_A.hw, out.l$heatwave, "A")
 
 # Combine all plots (i.e. recreate Drake et al. Fig 5 with all models)
 AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) + 

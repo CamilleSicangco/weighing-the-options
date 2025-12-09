@@ -12,13 +12,13 @@ prescribedE_pred = function(df, Wind = 5, Wleaf = 0.025, LeafAbs=0.5,
   Tleaf = as.numeric(Tleaf)
   Dleaf = try(VPDairToLeaf(Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD))
   #gs = try(calc_gw(E = df$Trans, D_leaf = Dleaf))
-  gs = try(calc_gw(E = df$E, Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD, 
+  gs = try(calc_gw_diff(E = df$E, Tleaf = Tleaf, Tair = df$Tair, VPD = df$VPD, 
                    PPFD = df$PPFD, Wind = Wind, Wleaf = Wleaf))
   Agr =  mapply(plantecophys::Photosyn, VPD = df$VPD, 
               Ca = 400, PPFD = df$PPFD, Tleaf = df$Tcan, Tair = df$Tair,
               GS = gs,
-              Vcmax=34,EaV=51780,EdVC=2e5,delsC=640,
-              Jmax = 60,EaJ=21640,EdVJ=2e5,delsJ=633, Rd0 = 0)
+              Vcmax=100.52,EaV=51780,EdVC=2e5,delsC=640,
+              Jmax = 165.53,EaJ=21640,EdVJ=2e5,delsJ=633, Rd0 = 0)
   Rd = Rd0 * exp(0.1012 * (Tleaf - TrefR) - 5e-04 * (Tleaf^2 - 
                                                        TrefR^2))
   A = as.numeric(Agr[2, ]) - Rd
@@ -42,9 +42,9 @@ make_pred = function(
     LeafAbs=0.5,
     Tcrit = 46.5,
     T50 = 59.6,
-    kmax_25 = 0.5,
-    Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-    Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
+    kmax_25 = 1.5,
+    Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+    Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635,
     Rd0 = 0.92,
     constr_Ci = FALSE,
     ...) {
@@ -78,6 +78,9 @@ make_pred = function(
                                           Wind = Wind, Wleaf = Wleaf, 
                                           LeafAbs = LeafAbs,
                                           Tcrit = Tcrit, T50 = T50,
+                                          Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                                          Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                                          Rd0 = Rd0,
                                           ...)
   )
   preds = data.frame(t(preds))
@@ -100,12 +103,13 @@ make_pred_fn = function(P, b, c,
                          T50 = 50.4,
                          P50 = 4.07,
                          P88 = 5.50,
-                         kmax_25 = 0.5,
-                         Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                         Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635,
+                         kmax_25 = 1.5,
+                         Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+                         Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635,
                          Rd0 = 0.92,
                          model,
                          constr_Ci = FALSE,
+                        Patm = 101.325,
                          #constant_kmax = TRUE,
                          ...) {
   
@@ -141,9 +145,34 @@ make_pred_fn = function(P, b, c,
     Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
                        Wleaf = Wleaf, LeafAbs = LeafAbs)
     Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
-    gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
+    gs = calc_gw_diff(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
                  PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
     
+    # Recalculate E with Penman-Monteith
+    #E = gs*1000*Dleaf/101.325
+    #H2OLV0 <- 2501000
+    #H2OMW <- 0.018
+    #CPAIR <- 1010
+    #AIRMA <- 0.029
+    #UMOLPERJ <- 4.57
+    #DHEAT <- 2.15e-05
+    #Tair_k <- Tair + 273.15
+    #LHV <- (H2OLV0 - 2365 * Tair) * H2OMW
+    #GAMMA <- CPAIR * AIRMA * Patm * 1000/LHV
+    #SLOPE <- (plantecophys::esat(Tair + 0.1, Pa = Patm) - plantecophys::esat(Tair, 
+    #                                                                         Pa = Patm))/0.1
+    #CMOLAR <- Patm * 1000/(8.314 * Tair_k)
+    #Gbhforced <- 0.003 * sqrt(Wind/Wleaf) * CMOLAR
+    #GRASHOF <- 1.6e+08 * abs(Tleaf - Tair) * (Wleaf^3)
+    #Gbhfree <- 0.5 * DHEAT * (GRASHOF^0.25)/Wleaf * CMOLAR
+    #Gbh <- 2 * (Gbhfree + Gbhforced)
+    #Rsol <- 2 * PPFD/UMOLPERJ
+    #E = (SLOPE * Rsol + Dleaf * 1000 * Gbh * 
+    #    CPAIR * AIRMA)/(GAMMA * Gbh / gs + SLOPE)/LHV*1000
+    
+    # Keep this re-updated Pleaf 
+    #Pleaf_idx = which.min(abs(E - E_vec))
+    #Pleaf_alt = P[Pleaf_idx]
     new_JT = if (model %in% c("Sperry + TC", "Sperry + CGnet + TC")) {
       TRUE
     } else {
@@ -346,7 +375,7 @@ Photosyn_custom <- function(VPD=1.5,
     Gbh <- 2 * (Gbhfree + Gbhforced)
     Gbw = Gbh / 0.93
     Gbc <- Gbw / 1.37 # Aphalo and Jarvis 1993
-    
+    Gbc = 1E9
     GC = (Gsc * Gbc) / (Gsc + Gbc)
     
     #GC = Gsc
@@ -718,9 +747,9 @@ get_predictions =
   function(
     df, Tcrit = 46.5, T50 = 50.4, P50 = 4.07, P88 = 5.50,
     Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
-    Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-    Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
-    kmax_25 = 0.5, #net = TRUE, netOrig = TRUE,
+    Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+    Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
+    kmax_25 = 1.5, #net = TRUE, netOrig = TRUE,
     g1 = 2.9, g0=1.e-5, b_USO = 0.55,
     constr_Ci = FALSE,
     ...
@@ -756,6 +785,10 @@ get_predictions =
     
     # Combine all predictions
     out_all = bind_rows(out, Medlyn_preds_sim)
+    
+    out_all$E = out_all$E/2.7
+    out_all$A = out_all$A/2.7
+    
     return(out_all)
   }
 
@@ -824,4 +857,238 @@ TJmax <- function(Tleaf, EaJ, delsJ, EdVJ){
   J1 <- 1+exp((298.15*delsJ-EdVJ)/8.314/298.15)
   J2 <- 1+exp(((Tleaf + 273.15)*delsJ-EdVJ)/8.314/(Tleaf + 273.15))
   exp(EaJ/8.314*(1/298.15 - 1/(Tleaf + 273.15)))*J1/J2
+}
+
+# Version of calc_gw based on diffusivity, rather than Penman Monteith
+calc_gw_diff = function (
+    E,
+    Tleaf = 25,
+    Patm = 101.325,
+    Tair = 25,
+    VPD = 1.5,
+    PPFD = 1000,
+    Wind = 5,
+    Wleaf = 0.025) {
+  
+  
+  H2OLV0 <- 2501000
+  H2OMW <- 0.018
+  CPAIR <- 1010
+  AIRMA <- 0.029
+  UMOLPERJ <- 4.57
+  DHEAT <- 2.15e-05
+  Tair_k <- Tair + 273.15
+  LHV <- (H2OLV0 - 2365 * Tair) * H2OMW
+  GAMMA <- CPAIR * AIRMA * Patm * 1000/LHV
+  SLOPE <- (plantecophys::esat(Tair + 0.1, Pa = Patm) - plantecophys::esat(Tair, 
+                                                                           Pa = Patm))/0.1
+  CMOLAR <- Patm * 1000/(8.314 * Tair_k)
+  Gbhforced <- 0.003 * sqrt(Wind/Wleaf) * CMOLAR
+  GRASHOF <- 1.6e+08 * abs(Tleaf - Tair) * (Wleaf^3)
+  Gbhfree <- 0.5 * DHEAT * (GRASHOF^0.25)/Wleaf * CMOLAR
+  Gbh <- 2 * (Gbhfree + Gbhforced)
+  Rsol <- 2 * PPFD/UMOLPERJ
+  Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, 
+                                     VPD = VPD, Pa = Patm)
+  g_w = GAMMA * Gbh * 1/((SLOPE * Rsol + Dleaf * 1000 * Gbh * 
+                            CPAIR * AIRMA)/(LHV * E/1000) - SLOPE)
+  #g_w = Patm*E/Dleaf/1000
+  return(g_w)
+}
+
+calc_costgain_new = function(
+    P,
+    b = -2.5,
+    c = 2,
+    Amax_gross = NULL,
+    Amax_net = NULL,
+    kmax_25 = 4,
+    Tair = 25,
+    VPD = 1.5,
+    ratiocrit = 0.05,
+    PPFD = 1000,
+    Patm = 101.325,
+    Wind = 5,
+    Wleaf = 0.025,
+    LeafAbs = 0.5,
+    Tcrit = 50,
+    T50 = 51,
+    Ca = 400,
+    Rd0 = 0.92,
+    TrefR = 25,
+    Vcmax=100.52,
+    EaV=62307,
+    EdVC=2e5,
+    delsC=639,
+    Jmax = 165.53,
+    EaJ=33115,
+    EdVJ=2e5,
+    delsJ=635,
+    constr_Ci = FALSE,
+    ...
+)
+{
+  if(is.null(P)) {
+    return(NULL)
+  }
+  
+  # Carbon gains
+  if(isFALSE(constr_Ci)) {
+    CG_gross_constkmax = C_gain(
+      P, b, c, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = TRUE, net = FALSE, new_JT = FALSE,
+      ...)
+    CG_gross_varkmax = C_gain(
+      P, b, c, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, net = FALSE, new_JT = FALSE,
+      ...)
+    CG_net = C_gain(
+      P, b, c, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, net = TRUE, netOrig = TRUE, new_JT = FALSE,
+      ...)
+    CG_net_newJT = C_gain(
+      P, b, c, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, net = TRUE, netOrig = TRUE, new_JT = TRUE,
+      ...)
+  } else {
+    CG_gross_constkmax = C_gain_alt(
+      P, b, c, Amax = NULL, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = TRUE, new_JT = FALSE, net = FALSE,
+      ...)
+    CG_gross_varkmax = C_gain_alt(
+      P, b, c, Amax = NULL, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, new_JT = FALSE, net = FALSE,
+      ...)
+    CG_net = C_gain_alt(
+      P, b, c, Amax = NULL, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, new_JT = FALSE, net = TRUE,
+      ...)
+    CG_net_newJT = C_gain_alt(
+      P, b, c, Amax = NULL, kmax_25 = kmax_25,
+      Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs,
+      Tair = Tair, PPFD = PPFD,
+      VPD = VPD, Tcrit = Tcrit, T50 = T50,
+      Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+      Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ,
+      constant_kmax = FALSE, new_JT = TRUE, net = TRUE,
+      ...)
+  }
+  
+  # Hydraulic costs
+  HC_constkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = TRUE)
+  HC_varkmax = hydraulic_cost(P, b, c, kmax_25, Tair, constant_kmax = FALSE)
+  
+  # Thermal cost
+  TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm,
+                    Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
+  
+  df = data.frame(P,
+                  HC_constkmax, HC_varkmax,
+                  TC,
+                  CG_gross_constkmax, CG_gross_varkmax,
+                  CG_net, CG_net_newJT)
+  return(df)
+}
+
+
+calc_photo = function(Tair = 25,
+                  VPD = 1.5,
+                  PPFD = 1000,
+                  Patm = 101.325,
+                  E = 2,
+                  Wind = 5,
+                  Wleaf = 0.025,
+                  LeafAbs = 0.5,
+                  Ca = 400,
+                  Jmax = 100,
+                  Vcmax = 50,
+                  net = FALSE,
+                  Rd0 = 0.92,
+                  TrefR = 25,
+                  netOrig = TRUE,
+                  g1 = 2.9,
+                  g0 = 0.003,
+                  g_w = NULL,
+                  Tleaf = NULL,
+                  ...
+)
+{
+  if (is.null(g_w) & is.null(Tleaf)) {
+    Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD,
+                       E = E, Wind = Wind, Patm = Patm, Wleaf = Wleaf,
+                       LeafAbs = LeafAbs)
+    gs_in = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind,
+                  Wleaf)
+  }
+  
+  # Get leaf VPD
+  Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD, Pa = Patm)
+  
+  if (net == FALSE) {
+    Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                          Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                          GS = gs_in, Rd = 0, Jmax = Jmax, Vcmax = Vcmax, g1 = g1,
+                          g0 = g0, ...)
+    Anet = as.numeric(Photosyn_out[2, ])
+    Rd = as.numeric(Photosyn_out[8, ])
+    A = Anet + Rd
+  }
+  else {
+    if (isTRUE(netOrig)) {
+      Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                            GS = gs_in, Jmax = Jmax, Vcmax = Vcmax, g1 = g1,
+                            g0 = g0, ...)
+      A = as.numeric(Photosyn_out[2, ])
+    }
+    else {
+      Rd = Rd0 * exp(0.1012 * (Tleaf - TrefR) - 5e-04 *
+                       (Tleaf^2 - TrefR^2))
+      Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                            Ca = Ca, PPFD = PPFD, Tleaf = Tleaf, Patm = Patm,
+                            GS = gs_in, Rd = 0, Jmax = Jmax, Vcmax = Vcmax,
+                            g1 = g1, g0 = g0, ...)
+      A = as.numeric(Photosyn_out[2, ]) - Rd
+    }
+  }
+  Ci = as.numeric(Photosyn_out[1, ])
+  gs_out = as.numeric(Photosyn_out[3, ])
+  
+  out = data.frame(A, Ci, gs_in, gs_out)
+  return(out)
 }

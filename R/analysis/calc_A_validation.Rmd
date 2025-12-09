@@ -96,7 +96,7 @@ Next we set up the environmental variables and physiological parameters.
 
 ``` {r set_vars}
 # Environment
-Tair = 46
+Tair = 25
 Ca = 400
 Ps = 0.5
 VPD = RHtoVPD(RH = 60, Tair)

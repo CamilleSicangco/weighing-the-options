@@ -24,9 +24,14 @@ fluxes_df$DateTime_hr <- as.POSIXct(fluxes_df$DateTime_hr,format="%Y-%m-%d %T",t
 fluxes_df$Tdiff <- with(fluxes_df,Tcan-Tair)
 
 # Calculate conductance with Penman-Monteith
-fluxes_df$gs = calc_gw(E = fluxes_df$E, Tleaf = fluxes_df$Tcan,
-                       Tair = fluxes_df$Tair, VPD = fluxes_df$VPD,
-                       PPFD = fluxes_df$PPFD)
+#fluxes_df$gs = calc_gw(E = fluxes_df$E, Tleaf = fluxes_df$Tcan,
+#                       Tair = fluxes_df$Tair, VPD = fluxes_df$VPD,
+#                       PPFD = fluxes_df$PPFD)
+
+# Or based on diffusivity
+Patm = 101.325
+fluxes_df$gs <- fluxes_df$E*Patm/fluxes_df$Dleaf/100
+
 fluxes_df$Dleaf <- VPDairToLeaf(VPD=fluxes_df$VPD,Tair=fluxes_df$Tair,Tleaf=fluxes_df$Tcan)
 fluxes_df$Atogs <- with(fluxes_df,A/(gs*1000))
 
