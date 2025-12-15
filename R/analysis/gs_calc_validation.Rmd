@@ -1,0 +1,71 @@
+---
+title: "Validation of gs calculations"
+author: "Camille K. Sicangco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load packages and functions
+library(here)
+source(here("R/load_packages.R"))
+source(here("R/functions/data_processing_functions.R"))
+source(here("R/functions/analysis_functions.R"))
+source(here("R/functions/plotting_functions.R"))
+
+# Replace plantecophys::Photosyn with custom version to use the Heskel et al. 2017 R(T) equation
+environment(Photosyn_custom) <- asNamespace("plantecophys")
+assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
+```
+
+We first set up the environmental variables and hydraulic parameters.
+```{r setup}
+# Environment
+Tair = 25
+Ps = 0.5
+
+# Hydraulics
+P50 =4.07
+P88 = 5.5
+Weibull = fit_Weibull(P50, P88)
+b = Weibull[1,1]
+c = Weibull[1,2]
+Pcrit = calc_Pcrit(b, c)
+P = Ps_to_Pcrit(Ps, Pcrit, pts = 500)
+```
+
+
+We then calculate the corresponding physiological variables.
+```{r physio}
+E = trans_from_vc(P, kmax_25 = 0.5, Tair, b, c, constant_kmax = TRUE)
+
+Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD,
+                   E = E)
+gs_in = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, PPFD = PPFD)
+Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
+Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaf,
+                      Ca = 400, PPFD = PPFD, Tleaf = Tleaf, GS = gs_in)
+```
+
+We then check if the gs from `plantecophys::Photosyn` matches the input gs.
+```{r photosynthesis}
+# Outputs from Photosyn
+A = as.numeric(Photosyn_out[2, ])
+Ci = as.numeric(Photosyn_out[1, ])
+
+# Corresponding conductance
+gs_out <- A/(400 - Ci)*1.57
+plot(gs_in)
+points(gs_out, col = "red")
+plot(gs_in - gs_out)
+```
+
+From the above results, we see that the gs output matches the input (with slight differences due to gb). The mismatch that we observed previously was the result of using the wrong equation to calculate the output gs:
+```{r old_photo}
+# Wrong version that we used previously:
+gs_out_old = A * (400 - Ci)/1.57
+plot(gs_in)
+plot(gs_out_old, col = "blue")
+```

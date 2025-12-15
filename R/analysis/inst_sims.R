@@ -15,7 +15,7 @@ Tcrit = 46.5
 T50 = 50.4
 
 # Hydraulics
-Weibull = fit_Weibull(P50 = 4.47, P88 = 5.50)
+Weibull = fit_Weibull(P50 = 4.07, P88 = 5.50)
 b = Weibull[1,1]
 c = Weibull[1,2]
 kmax_25 = 0.5
@@ -31,8 +31,8 @@ cost_gain40 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
                             Wind = 5, Wleaf = 0.025, LeafAbs = 0.5,
-                            Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                            Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
+                            Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+                            Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
 
 Fig2 = composite_plot(cost_gain40)
@@ -46,8 +46,8 @@ cost_gain48 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
                             Wind = 5, Wleaf = 0.02, LeafAbs = 0.5,
-                            Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                            Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
+                            Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+                            Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 Fig3 = composite_plot(cost_gain48)
 ggsave(filename = "figs/Fig3_48deg_inst_sim.tiff", Fig3, 
@@ -60,8 +60,8 @@ cost_gain30 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Tair = Tair, PPFD = PPFD, VPD = VPD,
                             Tcrit = Tcrit, T50 = T50,
                             Wind = 5, Wleaf = 0.02, LeafAbs = 0.5,
-                            Vcmax=34,EaV=62307,EdVC=2e5,delsC=639,
-                            Jmax = 60,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
+                            Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+                            Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 FigS4 = composite_plot(cost_gain30)
 ggsave(filename = "figs/FigS4_30deg_inst_sim.tiff", FigS4, 

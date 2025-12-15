@@ -126,7 +126,7 @@ load("data/out/heatwave_runs.Rdata")
 
 ## Prep outputs ---------------------
 
-preds = list(list(control, pred.c), list(heatwave, pred.hw_DKparams))
+preds = list(list(control, pred.c), list(heatwave, pred.hw))
 out.l = lapply(preds, function(ls) {
   out = data.frame(datetime = c(ls[[1]]$DateTime_hr, rep(ls[[1]]$DateTime_hr, each = 4), 
                                 ls[[1]]$DateTime_hr),
@@ -188,7 +188,8 @@ AEvT.plt =
 ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7, bg = "white")
 
 ## Figure 6: Tleaf predictions vs observations -------------------------
-
+Tcrit = 46.5
+T50 = 50.4
 Tleaf_pred_obs.plt = 
   bind_rows(out.l, .id = "treatment") %>% 
   pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime, treatment)) %>% 

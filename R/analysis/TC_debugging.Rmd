@@ -1,0 +1,134 @@
+---
+title: "Thermal cost oscillation debugging"
+author: "Camille K. Sicangco"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Load packages and functions
+library(here)
+source(here("R/load_packages.R"))
+source(here("R/functions/data_processing_functions.R"))
+source(here("R/functions/analysis_functions.R"))
+source(here("R/functions/plotting_functions.R"))
+
+# Replace plantecophys::Photosyn with custom version to use the Heskel et al. 2017 R(T) equation
+environment(Photosyn_custom) <- asNamespace("plantecophys")
+assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
+```
+
+``` {r make_pred_TC, include = FALSE}
+# Generate predictions for thermal cost model only
+make_pred_TC = function(
+    Tair, Ps, VPD, PPFD, 
+    P50 = 4.07, P88 = 5.5,
+    Wind = 5,
+    Wleaf = 0.025,
+    LeafAbs=0.5,
+    Tcrit = 46.5, T50 = 50.4,
+    kmax_25 = 1.5,
+    Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+    Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635,
+    Rd0 = 0.92,
+    constr_Ci = FALSE,
+    ...) {
+  
+  # Hydraulics
+  Weibull = fit_Weibull(P50, P88)
+  b = Weibull[1,1]
+  c = Weibull[1,2]
+  Pcrit = calc_Pcrit(b, c)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 500)
+  
+  
+  # Calculate costs and gains
+  cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
+                            PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, 
+                            LeafAbs = LeafAbs, 
+                            Tcrit = Tcrit, T50 = T50, 
+                            Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                            Rd0 = Rd0, constr_Ci = constr_Ci, ...)
+  
+  # Select relevant columns and calculate profit
+  df = cost_gain %>% 
+    dplyr::select(P, HC = HC_varkmax, TC, CG = CG_net_newJT) %>% 
+    dplyr::mutate(profit = CG - (HC + TC))
+
+  return(df)
+}
+```
+## Debugging of oscillations in the thermal cost
+
+Theoretical simulations show that the ProfitMax_[TC] predicts oscillatory behaviour of gs with respect to Tleaf.
+```{r theoretical_sims}
+Tair_vec = seq(20,60, by = 1)
+Tair_sim_constVPD.df = data.frame(Tair = Tair_vec, PPFD = 1500, VPD = 1.5,
+                         Ps = 0.5)
+
+preds = make_pred_Tthresholds(Tair_sim_constVPD.df, 
+                              hold_Tcrit = TRUE,
+                              Thold_val = 46.5,
+                              Tvar_vals = 50.4)
+
+preds %>% 
+  ggplot(aes(x = Tleaf, y = gs)) + 
+    geom_point() + 
+    theme_classic() +
+    ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
+    xlab(expression("T"[leaf]*" (\u00B0C)"))
+```
+
+To understand why these oscillations behaviour occurs, we can look at the corresponding profit function over the range of temperatures over which the oscillations occur.
+
+``` {r profit}
+# Environmental variables
+Tair_vec = seq(45,55, by = 0.5)
+PPFD = 1500
+VPD = 1.5
+
+# Run TC model
+Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
+
+out.l = (lapply(1:nrow(Tair_sim.df), 
+                function(i) make_pred_TC(
+                  Tair = Tair_sim.df$Tair[i], Ps = Tair_sim.df$Ps[i], 
+                  VPD = Tair_sim.df$VPD[i], PPFD = Tair_sim.df$PPFD[i])))
+names(out.l) = Tair_sim.df$Tair
+out = bind_rows(out.l, .id = "Tair")
+
+# Plot 
+out %>% 
+  filter(!is.na(profit)) %>% 
+  ggplot(aes(x = P, y = profit, color = Tair)) + 
+  geom_line() +
+  theme_classic() +
+  scale_color_viridis_d(option = "plasma") +
+  xlab("Pleaf (-MPa)")
+```
+The profit function is non-monotonic with respect to Pleaf. The shape can result in either of two optima: either Pleaf = Ps (i.e. stomata are closed) or at a local maxima where Pleaf < Ps and stomata are open. The predicted case depends on the value of Tair.
+
+We can then examine the associated optimisation indices and values of Pleaf.
+``` {r optimise}
+indices = sapply(out.l, function(df) which.max(df$profit))
+Ps = mapply(function(df, i) df$P[i],out.l, indices)
+plot(Tair_vec, indices, xlab = "Tair (deg C)", ylab = "optimal index")
+plot(Tair_vec, -Ps, xlab = "Tair (deg C)", ylab = "Pleaf (MPa)")
+```
+
+We see that stomata are predicted to open increasingly until Tair exceeds 46 deg C, beyond which they rapidly shut down until Tair exceeds 48 deg C, when stomata reopen before gradually closing.
+
+Notably, the above plots do not show as many oscillations as the first plot does. This is because we have plotted against Tair in the latter case and Tleaf in the former. The feedback between gs and Tleaf causes Tleaf to increase when gs decreases and vice versa. We can see this by re-plotting the first results versus Tair instead of Tleaf.
+
+``` {r re-plot}
+# Plot 
+preds %>% 
+  ggplot(aes(x = Tair, y = gs)) + 
+    geom_line() + 
+    theme_classic() +
+    ylab(expression("g"[s]*" (mol m"^-2*"s"^-1*")")) +
+    xlab(expression("T"[air]*" (\u00B0C)"))
+```
