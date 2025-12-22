@@ -21,32 +21,6 @@ range(VPDs$maxVPD[VPDs$HWtrt == "HW"])
 # Subset the model predictions for the ambient treatment  
 control <- subset(WTC4_data,HWtrt=="C" & PPFD > 500)
 
-## Prescribed E ----------------------------------------------------------------
-
-# Test energy balance by prescribing E
-pred_prescE.c = prescribedE_pred(df = filter(control, !is.na(gs)))
-
-diff_long.c = pred_prescE.c %>% 
-  select(ends_with(".diff")) %>%
-  pivot_longer(cols = ends_with(".diff"), names_to = "var", values_to = "diff",
-               names_pattern = "(.*).diff")
-obs_long.c = pred_prescE.c %>% 
-  select(ends_with(".obs")) %>%
-  select(!E.obs) %>% 
-  pivot_longer(cols = ends_with("obs"), names_to = "var", values_to = "obs",
-               names_pattern = "(.*).obs")
-prescE_long.c = cbind(diff_long.c, obs_long.c[2])
-
-prescE_long.c %>% 
-  ggplot(aes(x = obs, y = diff)) +
-  geom_point(alpha = 0.3) +
-  geom_hline(yintercept = 0, color = "blue") +
-  facet_wrap(vars(var), scales = "free") +
-  theme_classic() +
-  ggtitle("Control")
-
-### Fitting --------------------------------------------------------------------
-
 # GAMs
 gam_E.c = gam(E ~ s(Tcan), data = control)
 gam_A.c = gam(A ~ s(Tcan), data = control)
@@ -69,42 +43,6 @@ load("data/out/control_runs.Rdata")
 
 # Subset the model predictions for the ambient treatment  
 heatwave <- subset(WTC4_data,HWtrt=="HW" & PPFD > 500 & E >= 0)
-
-## Prescribed E tests ---------------------------------------------------------- 
-pred_prescE.hw = prescribedE_pred(df = filter(heatwave, !is.na(gs)))
-
-diff_long.hw = pred_prescE.hw %>% 
-  select(ends_with(".diff")) %>%
-  pivot_longer(cols = ends_with(".diff"), names_to = "var", values_to = "diff",
-               names_pattern = "(.*).diff")
-obs_long.hw = pred_prescE.hw %>% 
-  select(ends_with(".obs")) %>%
-  select(!E.obs) %>% 
-  pivot_longer(cols = ends_with("obs"), names_to = "var", values_to = "obs",
-               names_pattern = "(.*).obs")
-prescE_long.hw = cbind(diff_long.hw, obs_long.hw[2])
-
-prescE_long.hw %>% 
-  ggplot(aes(x = obs, y = diff)) +
-  geom_point(alpha = 0.3) +
-  geom_hline(yintercept = 0, color = "blue") +
-  facet_wrap(vars(var), scales = "free") +
-  theme_classic() + ggtitle("Heatwave")
-
-# Test leaf temperature predictions only
-Tleaves.hw = try(calc_Tleaf(heatwave$Tair, VPD = heatwave$VPD, E = heatwave$E, 
-                           PPFD = heatwave$PPFD, Wind = 4, Wleaf = 0.04, LeafAbs = 0.5))
-Tleaves.hw[grep("Error", Tleaves.hw)] = NA
-Tleaves.hw = as.numeric(Tleaves.hw)
-
-# Tends to over-predict leaf temperature slightly
-Tdiff.hw = Tleaves.hw - heatwave$Tcan
-summary(Tdiff.hw)
-hist(Tdiff.hw)
-plot(x = heatwave$Tcan, y = Tdiff.hw, col = "deeppink")
-abline(h = 0, col = "blue")
-
-## Fitting ---------------------------------------------------------------------
 
 # Fit GAMs
 gam_E.hw = gam(E ~ s(Tcan), data = heatwave)
@@ -132,6 +70,8 @@ out.l = lapply(preds, function(ls) {
                                 ls[[1]]$DateTime_hr),
                    chamber = c(ls[[1]]$chamber, rep(ls[[1]]$chamber, each = 4), 
                                 ls[[1]]$chamber),
+                   PPFD = c(ls[[1]]$PPFD, rep(ls[[1]]$PPFD, each = 4), ls[[1]]$PPFD),
+                   Tair = c(ls[[1]]$Tair, rep(ls[[1]]$Tair, each = 4), ls[[1]]$Tair),
                    Model = c(rep("observed", nrow(ls[[1]])), ls[[2]]$Model),
                    E = c(ls[[1]]$E, ls[[2]]$E),
                    A = c(ls[[1]]$A, ls[[2]]$A),
@@ -184,7 +124,6 @@ AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) +
 AEvT.plt = 
   annotate_figure(AEvT.plt,
                   bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
-
 ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7, bg = "white")
 
 ## Figure 6: Tleaf predictions vs observations -------------------------
@@ -220,6 +159,39 @@ Tleaf_pred_obs.plt =
   theme(plot.title = element_blank(),text = element_text(size = 14)) +  
   xlim(NA, 53)
 ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11, bg = "white")
+
+df = out.l$heatwave %>% 
+  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime,  Tair)) %>% 
+  pivot_longer(cols = observed:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf")
+
+df$Model = factor(df$Model, levels = c("observed", "Medlyn", "Sperry", 
+                                         "Sperry + varkmax", "Sperry + CGnet", 
+                                         "Sperry + CGnet + TC"))
+df %>% 
+  ggplot() +
+  geom_point(aes(x = Tair, y = Tleaf, color = Model), shape = 1) +
+  theme_classic() +
+  scale_color_manual(values = palette,
+                     labels = c("Observations",
+                                "USO",
+                                "ProfitMax",
+                                expression("ProfitMax"[k[max](T)]),
+                                expression("ProfitMax"[net]),
+                                expression("ProfitMax"[TC])
+                     )) +
+  xlab(expression("T"[air]*" (\u00B0C)")) +
+  ylab(expression("T"[leaf]*" (\u00B0C)")) + 
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
+         linetype = "none") + 
+  geom_abline(slope = 1) +
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2))) + 
+  geom_hline(yintercept = Tcrit, linetype = "dashed", colour = "darkorange") +
+  annotate("text", x=10, y =Tcrit+2, label=expression("T"[crit]), hjust = -0.5, colour = "darkorange", size = 8)+ 
+  geom_hline(yintercept = T50, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x=10, y = T50 +2, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 8)+
+  theme(plot.title = element_blank(),text = element_text(size = 20)) +  
+  xlim(NA, 53)
+ggsave("figs/Fig6_Tleaf_vs_Tair.jpg", height = 7, width = 11, bg = "white")
 
 ## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
 

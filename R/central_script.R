@@ -17,18 +17,6 @@ source("R/functions/plotting_functions.R")
 environment(Photosyn_custom) <- asNamespace("plantecophys")
 assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
 
-# Replace gsthermal::calc_gw with version using diffusivity
-#environment(calc_gw_diff) <- asNamespace("gsthermal")
-#assignInNamespace("calc_gw", calc_gw_diff, ns = "gsthermal")
-
-# Replace gsthermal::calc_costgain with version using diffusivity
-environment(calc_costgain_new) <- asNamespace("gsthermal")
-assignInNamespace("calc_costgain", calc_costgain_new, ns = "gsthermal")
-
-# Replace gsthermal::calc_costgain with version using diffusivity
-environment(Cgain_alt_lowres) <- asNamespace("gsthermal")
-assignInNamespace("C_gain_alt", Cgain_alt_lowres, ns = "gsthermal")
-
 # WTC DATA PROCESSING ##########################################################
 
 # Process WTC4 input data

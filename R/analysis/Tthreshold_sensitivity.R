@@ -40,6 +40,7 @@ plts.l = lapply(1:length(preds.l), function(i) {
   # Specify if Tcrit or T50 are varied
   if (isTRUE(grepl("Tcrit", names(preds.l)[i]))) {
     plt = preds.l[[i]] %>% 
+      #filter(!(gs < 0.001)) %>% 
       ggplot(aes(x = Tleaf, y = gs, linetype = Tcrit, color = Tcrit))
     legend_label = expression("T"[crit]*" (\u00B0C)")
   } else {

@@ -83,5 +83,22 @@ ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6, bg = "white"
 # Fig S6: T50 sensitivity analysis #############################################
 
 # See R/analysis/Tthreshold_sensitivity.R
+# Environment
+Tair_vec = seq(20,60, by = 5)
+PPFD = 1500
+VPD = RHtoVPD(RH = 60, TdegC = Tair_vec)
 
-# TODO Fig S7: kmax sensitivity analysis ############################################
+# Ps = -0.5 MPa
+Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
+#out_Ps0.5_constRH = make_pred_compEB(Tair_sim.df, g1 = g1_alt)
+out = bind_rows(lapply(1:nrow(Tair_sim.df), 
+                       function(i) make_pred_compEB(
+                         Tair = Tair_sim.df$Tair[i], Ps = Tair_sim.df$Ps[i], 
+                         VPD = Tair_sim.df$VPD[i], PPFD = Tair_sim.df$PPFD[i],
+                         )))
+out$gs_feedback = rep(c("TRUE", "FALSE"), times = length(Tair_vec))
+out %>% 
+  #filter(gs_feedback == FALSE) %>% 
+  ggplot(aes(x = Tair, y = E, color = gs_feedback)) +
+  geom_point() +
+  theme_classic()

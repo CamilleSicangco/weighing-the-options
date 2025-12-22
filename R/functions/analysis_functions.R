@@ -53,11 +53,11 @@ make_pred = function(
   b = Weibull[1,1]
   c = Weibull[1,2]
   Pcrit = calc_Pcrit(b, c)
-  P = Ps_to_Pcrit(Ps, Pcrit, pts = 300)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 500)
   
   
   # Calculate costs and gains
-  cost_gain = calc_costgain_new(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
+  cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
                             PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
                             Tcrit = Tcrit, T50 = T50, 
                             Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
@@ -84,7 +84,7 @@ make_pred = function(
   )
   preds = data.frame(t(preds))
   rownames(preds) = NULL
-  preds = preds %>% mutate(across(Tair:A, as.numeric))
+  preds = preds %>% mutate(across(Tair:idx, as.numeric))
   return(preds)
 }
 
@@ -109,6 +109,8 @@ make_pred_fn = function(P, b, c,
                          model,
                          constr_Ci = FALSE,
                         Patm = 101.325,
+                        matrix_gross = FALSE,
+                        gs_feedback = TRUE,
                          #constant_kmax = TRUE,
                          ...) {
   
@@ -116,10 +118,18 @@ make_pred_fn = function(P, b, c,
   # Solve optimization
   if (model == "Sperry") {
     i = which.max(cost_gain$CG_gross_constkmax - cost_gain$HC_constkmax)
-  } else if (model == "Sperry + varkmax") {
-    i = which.max(cost_gain$CG_gross_varkmax - cost_gain$HC_varkmax)
   } else if (model == "Sperry + CGnet") {
-    i = which.max(cost_gain$CG_net - cost_gain$HC_varkmax)
+    i = if(isTRUE(matrix_gross)) {
+      which.max(cost_gain$CG_net_constkmax - cost_gain$HC_constkmax)
+    } else {
+      which.max(cost_gain$CG_net - cost_gain$HC_varkmax)
+      }
+  } else if (model == "Sperry + varkmax") {
+    i = if(isTRUE(matrix_gross)) {
+      which.max(cost_gain$CG_net - cost_gain$HC_varkmax)
+    } else {
+      which.max(cost_gain$CG_gross_varkmax - cost_gain$HC_varkmax)
+    }
   } else if (model == "Sperry + CGnet + TC") {
     i = which.max(cost_gain$CG_net_newJT - (cost_gain$HC_varkmax + cost_gain$TC))
   } else if (model == "Sperry + TC") {
@@ -142,7 +152,7 @@ make_pred_fn = function(P, b, c,
     P = P[i]
     E = E_vec[i]
     Tleaf = calc_Tleaf(Tair = Tair, E = E, VPD = VPD, PPFD = PPFD, Wind = Wind, 
-                       Wleaf = Wleaf, LeafAbs = LeafAbs)
+                       Wleaf = Wleaf, LeafAbs = LeafAbs, gs_feedback = gs_feedback)
     Dleaf = VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, VPD = VPD)
     gs = calc_gw(E = E, Tleaf = Tleaf, Tair = Tair, VPD = VPD, 
                  PPFD = PPFD, Wind = Wind, Wleaf = Wleaf)
@@ -184,12 +194,17 @@ make_pred_fn = function(P, b, c,
                Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
                Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT,
                ...)
-    
-    opt = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A#, i#, Ci, 
+    Ci = calc_Ci(Tleaf = Tleaf, g_w = gs, VPD = VPD, net = TRUE, netOrig = TRUE,
+               PPFD = PPFD, Wind = Wind, 
+               Wleaf = Wleaf, LeafAbs = LeafAbs,
+               Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+               Jmax = Jmax,EaJ=EaJ,EdVJ=EdVJ,delsJ=delsJ, new_JT = new_JT,
+               ...)
+    opt = c(model, Tair, Ps, P, E, Tleaf, Dleaf, gs, A, Ci, i/length(E_vec)#, Ci, 
             #i, cost_gain$CG_gross_constkmax[i], cost_gain$HC_constkmax[i]
             )
     
-    names(opt) = c("Model", "Tair", "Ps", "P", "E", "Tleaf", "Dleaf", "gs", "A"#, "idx"#, 
+    names(opt) = c("Model", "Tair", "Ps", "P", "E", "Tleaf", "Dleaf", "gs", "A","Ci", "idx"#, 
                    #"Ci", "idx", "CG", "HC"
                    )
     
@@ -770,7 +785,7 @@ get_predictions =
     Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92,
     kmax_25 = 1.5, #net = TRUE, netOrig = TRUE,
     g1 = 2.9, g0=1.e-5, b_USO = 0.55,
-    constr_Ci = FALSE,
+    constr_Ci = FALSE, scaling_factor = 2.9,
     ...
   ) {
     out = bind_rows(lapply(1:nrow(df), 
@@ -800,7 +815,7 @@ get_predictions =
       rename(E = ELEAF, Dleaf = VPDleaf, gs = GS, A = ALEAF) %>%
       mutate(Model = "Medlyn", .before = 1) %>%
       #mutate(P = NA) %>% 
-      select(Model, Tair, E, Tleaf, Dleaf, gs, A, P#, Ci
+      select(Model, Tair, E, Tleaf, Dleaf, gs, A, P, Ci
              )
     
     # Combine all predictions
@@ -808,8 +823,8 @@ get_predictions =
     #Medlyn_preds_sim$Ci = as.numeric(Medlyn_preds_sim$Ci)
     out_all = bind_rows(out, Medlyn_preds_sim)
     
-    out_all$E = out_all$E/2.9
-    out_all$A = out_all$A/2.9
+    out_all$E = out_all$E/scaling_factor
+    out_all$A = out_all$A/scaling_factor
     
     return(out_all)
   }
@@ -924,6 +939,7 @@ calc_costgain_new = function(
     EdVJ=2e5,
     delsJ=635,
     constr_Ci = FALSE,
+    matrix_gross = FALSE,
     ...
 )
 {
@@ -935,20 +951,39 @@ calc_costgain_new = function(
   TC = thermal_cost(P, b, c, kmax_25, Tair, VPD, PPFD, Patm, 
                     Wind, Wleaf, LeafAbs, Tcrit, T50, constant_kmax = FALSE)
   if (isFALSE(constr_Ci)) {
-    CG_gross_constkmax = Cgain_alt_lowres(P, b, c, Amax = NULL, 
-                                    kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
-                                    Tair = Tair, PPFD = PPFD, VPD = VPD, Tcrit = Tcrit, 
-                                    T50 = T50, Vcmax = Vcmax, EaV = EaV, EdVC = EdVC, 
-                                    delsC = delsC, Jmax = Jmax, EaJ = EaJ, EdVJ = EdVJ, 
-                                    delsJ = delsJ, constant_kmax = TRUE, new_JT = FALSE, 
-                                    net = FALSE, ...)
-    CG_gross_varkmax = Cgain_alt_lowres(P, b, c, kmax_25 = kmax_25, 
-                              Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, Tair = Tair, 
-                              PPFD = PPFD, VPD = VPD, Tcrit = Tcrit, T50 = T50, 
-                              Vcmax = Vcmax, EaV = EaV, EdVC = EdVC, delsC = delsC, 
-                              Jmax = Jmax, EaJ = EaJ, EdVJ = EdVJ, delsJ = delsJ, 
-                              constant_kmax = FALSE, net = FALSE, new_JT = FALSE, 
-                              ...)
+    CG_gross_constkmax =
+      if(isTRUE(matrix_gross)) {
+        Cgain_alt_lowres(P, b, c, Amax = NULL, 
+                         kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                         Tair = Tair, PPFD = PPFD, VPD = VPD, Tcrit = Tcrit, 
+                         T50 = T50, Vcmax = Vcmax, EaV = EaV, EdVC = EdVC, 
+                         delsC = delsC, Jmax = Jmax, EaJ = EaJ, EdVJ = EdVJ, 
+                         delsJ = delsJ, constant_kmax = TRUE, new_JT = FALSE, 
+                         net = FALSE, ...)
+      } else {
+        C_gain(P, b, c, Amax = NULL, 
+               kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+               Tair = Tair, PPFD = PPFD, VPD = VPD, Tcrit = Tcrit, 
+               T50 = T50, Vcmax = Vcmax, EaV = EaV, EdVC = EdVC, 
+               delsC = delsC, Jmax = Jmax, EaJ = EaJ, EdVJ = EdVJ, 
+               delsJ = delsJ, constant_kmax = TRUE, new_JT = FALSE, 
+               net = FALSE, ...)
+      }
+    if (isFALSE(matrix_gross)) {
+      CG_gross_varkmax = C_gain(P, b, c, Amax = NULL, 
+                                kmax_25 = kmax_25, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                                Tair = Tair, PPFD = PPFD, VPD = VPD, Tcrit = Tcrit, 
+                                T50 = T50, Vcmax = Vcmax, EaV = EaV, EdVC = EdVC, 
+                                delsC = delsC, Jmax = Jmax, EaJ = EaJ, EdVJ = EdVJ, 
+                                delsJ = delsJ, constant_kmax = FALSE, new_JT = FALSE, 
+                                net = FALSE, ...)
+    }
+    CG_net_constkmax = C_gain(P, b, c, kmax_25 = kmax_25, Wind = Wind, 
+                              Wleaf = Wleaf, LeafAbs = LeafAbs, Tair = Tair, PPFD = PPFD, 
+                              VPD = VPD, Tcrit = Tcrit, T50 = T50, Vcmax = Vcmax, 
+                              EaV = EaV, EdVC = EdVC, delsC = delsC, Jmax = Jmax, 
+                              EaJ = EaJ, EdVJ = EdVJ, delsJ = delsJ, constant_kmax = TRUE, 
+                              net = TRUE, netOrig = TRUE, new_JT = FALSE, ...)
     CG_net = C_gain(P, b, c, kmax_25 = kmax_25, Wind = Wind, 
                     Wleaf = Wleaf, LeafAbs = LeafAbs, Tair = Tair, PPFD = PPFD, 
                     VPD = VPD, Tcrit = Tcrit, T50 = T50, Vcmax = Vcmax, 
@@ -992,8 +1027,14 @@ calc_costgain_new = function(
                               constant_kmax = FALSE, new_JT = TRUE, net = TRUE, 
                               ...)
   }
-  df = data.frame(P, HC_constkmax, HC_varkmax, TC, CG_gross_constkmax, 
-                  CG_gross_varkmax, CG_net, CG_net_newJT)
+  df = 
+    if(isTRUE(matrix_gross)) {
+      data.frame(P, HC_constkmax, HC_varkmax, TC, CG_gross_constkmax, 
+                 CG_net_constkmax, CG_net, CG_net_newJT)
+    } else {
+      data.frame(P, HC_constkmax, HC_varkmax, TC, CG_gross_constkmax, 
+                 CG_gross_varkmax, CG_net, CG_net_newJT)
+    }
   return(df)
 }
 
@@ -1173,23 +1214,23 @@ Cgain_alt_lowres = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair 
           Rd0 = 0.92, TrefR = 25, net = TRUE, ...) 
 {
   E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
-  Cis = array(seq(1, Ca, length.out = 300), dim = c(300, length(E)))
+  Cis = array(seq(1, Ca, length.out = 500), dim = c(500, length(E)))
   Tleaf = calc_Tleaf(Tair = Tair, VPD = VPD, PPFD = PPFD, 
                      E = E, Wind = Wind, Patm = Patm, Wleaf = Wleaf, LeafAbs = LeafAbs)
   g_w = calc_gw(E, Tleaf, Patm, Tair, VPD, PPFD, Wind, Wleaf)
   Dleaf = plantecophys::VPDairToLeaf(Tleaf = Tleaf, Tair = Tair, 
                                      VPD = VPD, Pa = 101.325)
-  g_ws = t(array(g_w, dim = c(length(E), 300)))
+  g_ws = t(array(g_w, dim = c(length(E), 500)))
   A_supply = g_ws/1.6 * (Ca - Cis)
   if (isFALSE(net)) {
     Rd = Rd0 * exp(0.1178 * (Tleaf - TrefR) - 0.0007017 * (Tleaf^2 - 
     TrefR^2))
-    Rd = t(array(Rd, dim = c(length(E), 300)))
+    Rd = t(array(Rd, dim = c(length(E), 500)))
     A_supply = A_supply + Rd
   }
-  Es = t(array(E, dim = c(length(E), 300)))
-  Tleaves = t(array(Tleaf, dim = c(length(E), 300)))
-  Dleaves = t(array(Dleaf, dim = c(length(E), 300)))
+  Es = t(array(E, dim = c(length(E), 500)))
+  Tleaves = t(array(Tleaf, dim = c(length(E), 500)))
+  Dleaves = t(array(Dleaf, dim = c(length(E), 500)))
   Photosyn_out = mapply(plantecophys::Photosyn, VPD = Dleaves, 
                         Ca = Ca, PPFD = PPFD, Tleaf = Tleaves, Patm = Patm, 
                         Ci = Cis, Jmax = Jmax, Vcmax = Vcmax, Rd0 = Rd0, TrefR = TrefR, 
@@ -1202,7 +1243,7 @@ Cgain_alt_lowres = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair 
     Rd = as.numeric(Photosyn_out[8, ])
     A_demand = Anet + Rd
   }
-  dim(A_demand) = c(300, length(E))
+  dim(A_demand) = c(500, length(E))
   idx = apply(abs(A_supply - A_demand), 2, FUN = which.min)
   Ci = sapply(1:length(E), function(e) {
     Cis[idx[e], e]
@@ -1221,4 +1262,126 @@ Cgain_alt_lowres = function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 4, Tair 
   }
   gain = A_P/Amax
   return(gain)
+}
+
+# Generate predictions for all models
+make_pred_compEB = function(
+    Tair, Ps, VPD, PPFD, 
+    P50 = 4.07, P88 = 5.5,
+    Wind = 5,
+    Wleaf = 0.025,
+    LeafAbs=0.5,
+    Tcrit = 46.5,
+    T50 = 50.4,
+    kmax_25 = 1.5,
+    Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
+    Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635,
+    Rd0 = 0.92,
+    constr_Ci = FALSE,
+    ...) {
+  
+  # Hydraulics
+  Weibull = fit_Weibull(P50, P88)
+  b = Weibull[1,1]
+  c = Weibull[1,2]
+  Pcrit = calc_Pcrit(b, c)
+  P = Ps_to_Pcrit(Ps, Pcrit, pts = 500)
+  
+  
+  # Calculate costs and gains
+  cost_gain = calc_costgain(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
+                            PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                            Tcrit = Tcrit, T50 = T50, 
+                            Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                            Rd0 = Rd0, constr_Ci = constr_Ci, ...)
+  
+  # Calculate costs and gains
+  cost_gain_nogsfeedback = calc_costgain(P, b, c, kmax_25 = kmax_25, Tair = Tair, VPD = VPD, 
+                            PPFD = PPFD, Wind = Wind, Wleaf = Wleaf, LeafAbs = LeafAbs, 
+                            Tcrit = Tcrit, T50 = T50, 
+                            Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                            Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                            Rd0 = Rd0, constr_Ci = constr_Ci, 
+                            gs_feedback = FALSE, ...)
+  
+  CG_dfs = list(cost_gain, cost_gain_nogsfeedback)
+  
+  # Generate model predictions
+  preds = sapply(CG_dfs, 
+                 function(CG_df) make_pred_fn(model = "Sperry + CGnet", 
+                                          cost_gain = CG_df, 
+                                          P = P, b = b, c = c,
+                                          Tair = Tair, Ps = Ps, VPD = VPD, 
+                                          PPFD = PPFD, kmax_25 = kmax_25, 
+                                          Wind = Wind, Wleaf = Wleaf, 
+                                          LeafAbs = LeafAbs,
+                                          Tcrit = Tcrit, T50 = T50,
+                                          Vcmax=Vcmax,EaV=EaV,EdVC=EdVC,delsC=delsC,
+                                          Jmax = Jmax,EaJ=EaJ,EdVJ=EdVC,delsJ=delsJ,
+                                          Rd0 = Rd0,
+                                          ...)
+  )
+  preds = data.frame(t(preds))
+  rownames(preds) = NULL
+  preds = preds %>% mutate(across(Tair:idx, as.numeric))
+  return(preds)
+}
+
+LeafEnergyBalance2 = function (Tleaf = 21.5, Tair = 20, gs = 0.15, PPFD = 1500, VPD = 2, 
+                             Patm = 101, Wind = 2, Wleaf = 0.02, StomatalRatio = 1, LeafAbs = 0.5, 
+                             returnwhat = c("balance", "fluxes")) 
+{
+  returnwhat <- match.arg(returnwhat)
+  Boltz <- 5.67 * 10^-8
+  Emissivity <- 0.95
+  LatEvap <- 2.54
+  CPAIR <- 1010
+  H2OLV0 <- 2501000
+  H2OMW <- 0.018
+  AIRMA <- 0.029
+  AIRDENS <- 1.204
+  UMOLPERJ <- 4.57
+  DHEAT <- 2.15e-05
+  AIRDENS <- Patm * 1000/(287.058 * Tk(Tair))
+  LHV <- (H2OLV0 - 2365 * Tair) * H2OMW
+  SLOPE <- (esat(Tair + 0.1) - esat(Tair))/0.1
+  Gradiation <- 4 * Boltz * Tk(Tair)^3 * Emissivity/(CPAIR * 
+                                                       AIRMA)
+  CMOLAR <- Patm * 1000/(8.314 * Tk(Tair))
+  Gbhforced <- 0.003 * sqrt(Wind/Wleaf) * CMOLAR
+  GRASHOF <- 1.6e+08 * abs(Tleaf - Tair) * (Wleaf^3)
+  Gbhfree <- 0.5 * DHEAT * (GRASHOF^0.25)/Wleaf * CMOLAR
+  Gbh <- 2 * (Gbhfree + Gbhforced)
+  Gbhr <- Gbh + 2 * Gradiation
+  Gbw <- StomatalRatio * 1.075 * Gbh
+  gw <- gs * Gbw/(gs + Gbw)
+  Rlongup <- Emissivity * Boltz * Tk(Tleaf)^4
+  Rsol <- 2 * PPFD/UMOLPERJ
+  Rnet <- LeafAbs * Rsol - Rlongup
+  ea <- esat(Tair) - 1000 * VPD
+  ema <- 0.642 * (ea/Tk(Tair))^(1/7)
+  Rnetiso <- LeafAbs * Rsol - (1 - ema) * Boltz * Tk(Tair)^4
+  GAMMA <- CPAIR * AIRMA * Patm * 1000/LHV
+  ET <- (1/LHV) * (SLOPE * Rnetiso + 1000 * VPD * Gbh * CPAIR * 
+                     AIRMA)/(SLOPE + GAMMA * Gbhr/Gbw)
+  lambdaET <- LHV * ET
+  Y <- 1/(1 + Gradiation/Gbh)
+  H2 <- Y * (Rnetiso - lambdaET)
+  #H <- -CPAIR * AIRDENS * (Gbh/CMOLAR) * (Tair - Tleaf)
+  H = (Tleaf - Tair)* (CPAIR * Gbh + lambdaET * SLOPE * Gbw / Patm)
+  #Tleaf2 <- Tair + H2/(CPAIR * AIRDENS * (Gbh/CMOLAR))
+  Tleaf2 = Tair + H2 / (CPAIR * Gbh + lambdaET * SLOPE * Gbw / Patm)
+  EnergyBal <- Tleaf - Tleaf2
+  if (returnwhat == "balance") 
+    #return(c(H3,H2,H))
+    #return(c(Tleaf2,Tleaf3))
+    return(EnergyBal)
+  if (returnwhat == "fluxes") {
+    l <- data.frame(ELEAFeb = 1000 * ET, Gradiation = Gradiation, 
+                    Rsol = Rsol, Rnetiso = Rnetiso, Rlongup = Rlongup, 
+                    H = H, lambdaET = lambdaET, gw = gw, Gbh = Gbh, 
+                    H2 = H2, Tleaf2 = Tleaf2)
+    return(l)
+  }
 }
