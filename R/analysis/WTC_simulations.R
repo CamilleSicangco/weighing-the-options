@@ -191,7 +191,7 @@ df %>%
   annotate("text", x=10, y = T50 +2, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 8)+
   theme(plot.title = element_blank(),text = element_text(size = 20)) +  
   xlim(NA, 53)
-ggsave("figs/Fig6_Tleaf_vs_Tair.jpg", height = 7, width = 11, bg = "white")
+ggsave("figs/Fig6_Tleaf_vs_Tair.tiff", height = 7, width = 11, bg = "white")
 
 ## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
 
@@ -287,6 +287,8 @@ plt_timeseries = function(df,
       expression("E"*" (mmol m"^-2*"s"^-1*")")
     }
   
+  df = df %>% 
+    mutate(gs = ifelse(Model == "observed", gs, gs/2.9))
   plt = df %>% 
     ggplot() +
     geom_point(aes(x = datetime, y = !!sym(yvar), color = Model), alpha = 0.3, size = 0.5) +
