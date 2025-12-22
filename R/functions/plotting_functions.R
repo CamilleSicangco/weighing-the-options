@@ -464,21 +464,12 @@ plot_AEvT_WTC = function(
       expression("VPD"[leaf]*" (kPa)")
     } 
   
-  if (is.null(GAM)) {
-    plt = NULL
+  plt = if (is.null(GAM)) {
+    NULL
   } else {
-    if(yvar == "gs") {
-      df = df %>% 
-        mutate(gs = ifelse(Model == "observed", gs, gs/2.9))
-      plt = plotGAM(GAM, smooth.c = "Tcan") +
-        geom_point(data = df, aes(x = Tleaf, y = !!sym(yvar), color = Model), #shape = 1, 
-                   size = .5, alpha = 0.3)
-    } else {
-      plt = plotGAM(GAM, smooth.c = "Tcan") +
-        geom_point(data = df, aes(x = Tleaf, y = !!sym(yvar), color = Model), #shape = 1, 
-                   size = .5, alpha = 0.3) 
-    }
-    plt = plt +
+    plotGAM(GAM, smooth.c = "Tcan") +
+      geom_point(data = df, aes(x = Tleaf, y = !!sym(yvar), color = Model), #shape = 1, 
+                 size = .5, alpha = 0.3) +
       theme_classic() +
       scale_color_manual(
         values = palette,
