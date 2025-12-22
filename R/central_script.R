@@ -17,6 +17,10 @@ source("R/functions/plotting_functions.R")
 environment(Photosyn_custom) <- asNamespace("plantecophys")
 assignInNamespace("Photosyn", Photosyn_custom, ns = "plantecophys")
 
+# Replace plantecophys::LeafEnergyBalance with custom version using corrected Tleaf equation
+environment(LeafEnergyBalance_custom) <- asNamespace("plantecophys")
+assignInNamespace("LeafEnergyBalance", LeafEnergyBalance_custom, ns = "plantecophys")
+
 # WTC DATA PROCESSING ##########################################################
 
 # Process WTC4 input data
