@@ -126,145 +126,7 @@ AEvT.plt =
                   bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
 ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7, bg = "white")
 
-## Figure 6: Tleaf predictions vs observations -------------------------
-Tcrit = 46.5
-T50 = 50.4
-Tleaf_pred_obs.plt = 
-  bind_rows(out.l, .id = "treatment") %>% 
-  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime, treatment)) %>% 
-  pivot_longer(cols = Medlyn:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf_pred") %>% 
-  rename(Tleaf = observed) %>% 
-  ggplot() +
-  geom_point(aes(x = Tleaf, y = Tleaf_pred, color = Model), shape = 1) +
-  theme_classic() +
-  scale_color_manual(values = palette[-6],
-                     labels = c("USO",
-                                "ProfitMax",
-                                expression("ProfitMax"[k[max](T)]),
-                                expression("ProfitMax"[net]),
-                                expression("ProfitMax"[TC])
-                     )) +
-  xlab(expression("observed T"[leaf]*" (\u00B0C)")) +
-  ylab(expression("predicted T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") + 
-  geom_abline(slope = 1) +
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2))) + 
-  geom_vline(xintercept = 43.4, linetype = "dashed", colour = "darkorange") +
-  geom_hline(yintercept = 43.4, linetype = "dashed", colour = "darkorange") +
-  annotate("text", x=Tcrit, y = 10, label=expression("T"[crit]), hjust = -0.5, colour = "darkorange", size = 5)+ 
-  geom_vline(xintercept = 49.6, linetype = "dashed", colour = "orangered3") +
-  geom_hline(yintercept = 49.6, linetype = "dashed", colour = "orangered3") +
-  annotate("text", x=T50, y = 10, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 5)+
-  theme(plot.title = element_blank(),text = element_text(size = 14)) +  
-  xlim(NA, 53)
-ggsave("figs/Fig6_Tleaf_pred_vs_obs_WTC.tiff", Tleaf_pred_obs.plt, height = 7, width = 11, bg = "white")
-
-df = out.l$heatwave %>% 
-  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime,  Tair)) %>% 
-  pivot_longer(cols = observed:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf")
-
-df$Model = factor(df$Model, levels = c("observed", "Medlyn", "Sperry", 
-                                         "Sperry + varkmax", "Sperry + CGnet", 
-                                         "Sperry + CGnet + TC"))
-df %>% 
-  ggplot() +
-  geom_point(aes(x = Tair, y = Tleaf, color = Model), shape = 1) +
-  theme_classic() +
-  scale_color_manual(values = palette,
-                     labels = c("Observations",
-                                "USO",
-                                "ProfitMax",
-                                expression("ProfitMax"[k[max](T)]),
-                                expression("ProfitMax"[net]),
-                                expression("ProfitMax"[TC])
-                     )) +
-  xlab(expression("T"[air]*" (\u00B0C)")) +
-  ylab(expression("T"[leaf]*" (\u00B0C)")) + 
-  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
-         linetype = "none") + 
-  geom_abline(slope = 1) +
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2))) + 
-  geom_hline(yintercept = Tcrit, linetype = "dashed", colour = "darkorange") +
-  annotate("text", x=10, y =Tcrit+2, label=expression("T"[crit]), hjust = -0.5, colour = "darkorange", size = 8)+ 
-  geom_hline(yintercept = T50, linetype = "dashed", colour = "orangered3") +
-  annotate("text", x=10, y = T50 +2, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 8)+
-  theme(plot.title = element_blank(),text = element_text(size = 20)) +  
-  xlim(NA, 53)
-ggsave("figs/Fig6_Tleaf_vs_Tair.tiff", height = 7, width = 11, bg = "white")
-
-## Figure 7: Pleaf vs Tleaf ----------------------------------------------------
-
-Fig7_PleafvT = 
-  bind_rows(out.l) %>% 
-  filter(!is.na(Pleaf)) %>% 
-  ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
-  geom_point(shape = 1) +
-  scale_color_manual(values = palette[-c(6)],
-                     labels = c("USO",
-                                "ProfitMax",
-                                expression("ProfitMax"[k[max](T)]),
-                                expression("ProfitMax"[net]),
-                                expression("ProfitMax"[TC])
-                     )) +
-  theme_classic() +
-  xlab(expression("T"[leaf]*" (\u00B0C)")) +
-  ylab(expression(Psi[leaf]*" (-MPa)")) + 
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
-         linetype = "none") +
-  geom_hline(yintercept = 4.07, linetype = "dashed", colour = "darkorange") +
-  annotate("text", x = 20, y = 4.07, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
-  geom_hline(yintercept = 5.50, linetype = "dashed", colour = "orangered3") +
-  annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
-  theme(text = element_text(size = 16)) +
-  ylim(NA,5.7)
-ggsave("figs/Fig7_Pleaf_vs_T_WTC.tiff", Fig7_PleafvT, height = 7, width = 10, bg = "white")
-
-## E vs Tleaf -----------
-out.l$heatwave %>% 
-  filter(Model %in% c("observed", "Sperry", "Sperry + varkmax")) %>%
-  ggplot(aes(x = Dleaf, y = E, color = Model)) +
-geom_point(#size = .5, 
-           alpha = 0.3) +
-  theme_classic() +
-  scale_color_manual(
-    values = palette,
-    labels = c("Observations",
-               "ProfitMax",
-               expression("ProfitMax"[k[max](T)])
-    )) +
-  xlab(expression("D"[leaf]*" (kPa)")) +
-  guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
-         linetype = "none") +
-  theme(plot.title = element_blank())
-
-## gs vs Tleaf -----------
-
-# GAMs
-gam_gs.hw = gam(gs ~ s(Tcan), data = heatwave)
-gam_gs.c = gam(gs ~ s(Tcan), data = control)
-
-gs_vs_Tleaf.hw = plot_AEvT_WTC(gam_gs.hw, out.l$heatwave, "gs")
-gs_vs_Tleaf.c = plot_AEvT_WTC(gam_gs.c, out.l$control, "gs")
-
-gs_vs_Tleaf.plt = 
-  ggarrange(gs_vs_Tleaf.c + #ylim(-2.5, 13) + 
-              ggtitle(expression(bold("(a)")*" Control")) + 
-              theme(axis.title.x = element_blank(), 
-                    plot.title = element_text(hjust = 0)), 
-            gs_vs_Tleaf.hw + #ylim(-2.5, 13) +
-              ggtitle(expression(bold("(b)")*" Heatwave")) +
-              theme(axis.title.y = element_blank(), 
-                    axis.title.x = element_blank(), 
-                    plot.title = element_text(hjust = 0)), 
-            nrow = 1, ncol = 2, common.legend = TRUE, legend = "right")
-
-gs_vs_Tleaf.plt = annotate_figure(gs_vs_Tleaf.plt,
-                bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
-
-ggsave(plot = gs_vs_Tleaf.plt, filename = "figs/FigS7_gs_vs_Tleaf.tiff", width = 11, height = 6, bg = "white")
-
-## Time series of A, E -----------
+## Figure 6: Time series of A, E -----------
 
 plt_timeseries = function(df,
                           heatwave = TRUE,
@@ -355,11 +217,118 @@ plt_comp = ggpubr::annotate_figure(plt_comp,
                                    bottom = "Date")
 aligned_plts2 = cowplot::align_plots(plt_comp, legend, align = "h", axis = "t")
 timeseries.plt = cowplot::plot_grid(aligned_plts2[[1]], aligned_plts2[[2]],
-                         rel_widths = c(1,0.2))
+                                    rel_widths = c(1,0.2))
 timeseries.plt
 
-ggsave(plot = timeseries.plt, filename = "figs/FigS8_timeseries.tiff", width = 11, height = 7, bg = "white")
+ggsave(plot = timeseries.plt, filename = "figs/Fig6_timeseries.tiff", width = 11, height = 7, bg = "white")
 
+## Figure 7: Tleaf predictions vs observations -------------------------
+Tcrit = 46.5
+T50 = 50.4
+
+df = out.l$heatwave %>% 
+  pivot_wider(names_from = Model, values_from = Tleaf, id_cols = c(chamber, datetime,  Tair)) %>% 
+  pivot_longer(cols = observed:"Sperry + CGnet + TC", names_to = "Model", values_to = "Tleaf")
+
+df$Model = factor(df$Model, levels = c("observed", "Medlyn", "Sperry", 
+                                         "Sperry + varkmax", "Sperry + CGnet", 
+                                         "Sperry + CGnet + TC"))
+df %>% 
+  ggplot() +
+  geom_point(aes(x = Tair, y = Tleaf, color = Model), shape = 1) +
+  theme_classic() +
+  scale_color_manual(values = palette,
+                     labels = c("Observations",
+                                "USO",
+                                "ProfitMax",
+                                expression("ProfitMax"[k[max](T)]),
+                                expression("ProfitMax"[net]),
+                                expression("ProfitMax"[TC])
+                     )) +
+  xlab(expression("T"[air]*" (\u00B0C)")) +
+  ylab(expression("T"[leaf]*" (\u00B0C)")) + 
+  guides(color = guide_legend(override.aes = list(alpha = 1, size = 2)),
+         linetype = "none") + 
+  geom_abline(slope = 1) +
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2))) + 
+  geom_hline(yintercept = Tcrit, linetype = "dashed", colour = "darkorange") +
+  annotate("text", x=10, y =Tcrit+2, label=expression("T"[crit]), hjust = -0.5, colour = "darkorange", size = 8)+ 
+  geom_hline(yintercept = T50, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x=10, y = T50 +2, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 8)+
+  theme(plot.title = element_blank(),text = element_text(size = 20)) +  
+  xlim(NA, 53)
+ggsave("figs/Fig7_Tleaf_vs_Tair.tiff", height = 7, width = 11, bg = "white")
+
+## Figure 8: Pleaf vs Tleaf ----------------------------------------------------
+
+Fig8_PleafvT = 
+  bind_rows(out.l) %>% 
+  filter(!is.na(Pleaf)) %>% 
+  ggplot(aes(x = Tleaf, y = Pleaf, color = Model)) +
+  geom_point(shape = 1) +
+  scale_color_manual(values = palette[-c(6)],
+                     labels = c("USO",
+                                "ProfitMax",
+                                expression("ProfitMax"[k[max](T)]),
+                                expression("ProfitMax"[net]),
+                                expression("ProfitMax"[TC])
+                     )) +
+  theme_classic() +
+  xlab(expression("T"[leaf]*" (\u00B0C)")) +
+  ylab(expression(Psi[leaf]*" (-MPa)")) + 
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2)),
+         linetype = "none") +
+  geom_hline(yintercept = 4.07, linetype = "dashed", colour = "darkorange") +
+  annotate("text", x = 20, y = 4.07, label=expression("P"[50]), vjust = -0.5, colour = "darkorange", size = 5) +
+  geom_hline(yintercept = 5.50, linetype = "dashed", colour = "orangered3") +
+  annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
+  theme(text = element_text(size = 16)) +
+  ylim(NA,5.7)
+ggsave("figs/Fig8_Pleaf_vs_T_WTC.tiff", Fig8_PleafvT, height = 7, width = 10, bg = "white")
+
+## E vs Tleaf -----------
+out.l$heatwave %>% 
+  filter(Model %in% c("observed", "Sperry", "Sperry + varkmax")) %>%
+  ggplot(aes(x = Dleaf, y = E, color = Model)) +
+geom_point(#size = .5, 
+           alpha = 0.3) +
+  theme_classic() +
+  scale_color_manual(
+    values = palette,
+    labels = c("Observations",
+               "ProfitMax",
+               expression("ProfitMax"[k[max](T)])
+    )) +
+  xlab(expression("D"[leaf]*" (kPa)")) +
+  guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
+         linetype = "none") +
+  theme(plot.title = element_blank())
+
+## gs vs Tleaf -----------
+
+# GAMs
+gam_gs.hw = gam(gs ~ s(Tcan), data = heatwave)
+gam_gs.c = gam(gs ~ s(Tcan), data = control)
+
+gs_vs_Tleaf.hw = plot_AEvT_WTC(gam_gs.hw, out.l$heatwave, "gs")
+gs_vs_Tleaf.c = plot_AEvT_WTC(gam_gs.c, out.l$control, "gs")
+
+gs_vs_Tleaf.plt = 
+  ggarrange(gs_vs_Tleaf.c + #ylim(-2.5, 13) + 
+              ggtitle(expression(bold("(a)")*" Control")) + 
+              theme(axis.title.x = element_blank(), 
+                    plot.title = element_text(hjust = 0)), 
+            gs_vs_Tleaf.hw + #ylim(-2.5, 13) +
+              ggtitle(expression(bold("(b)")*" Heatwave")) +
+              theme(axis.title.y = element_blank(), 
+                    axis.title.x = element_blank(), 
+                    plot.title = element_text(hjust = 0)), 
+            nrow = 1, ncol = 2, common.legend = TRUE, legend = "right")
+
+gs_vs_Tleaf.plt = annotate_figure(gs_vs_Tleaf.plt,
+                bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
+
+ggsave(plot = gs_vs_Tleaf.plt, filename = "figs/FigS7_gs_vs_Tleaf.tiff", width = 11, height = 6, bg = "white")
 
 # Calculate TSM and HSM ########################################################
 
