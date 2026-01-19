@@ -1075,8 +1075,8 @@ LeafEnergyBalance_custom <- function(Tleaf = 21.5, Tair = 20,
   Rnetiso <- LeafAbs*Rsol - (1 - ema)*Boltz*Tk(Tair)^4 # isothermal net radiation
   
   # Isothermal version of the Penmon-Monteith equation
-  GAMMA <- CPAIR*AIRMA*Patm*1000/LHV
-  ET <- (1/LHV) * (SLOPE * Rnetiso + 1000*VPD * Gbh * CPAIR * AIRMA) / (SLOPE + GAMMA * Gbhr/gw)
+  GAMMA <- CPAIR*Patm*1000/LHV
+  ET <- (1/LHV) * (SLOPE * Rnetiso + 1000*VPD * Gbh * CPAIR) / (SLOPE + GAMMA * Gbhr/gw)
   
   # Latent heat loss
   lambdaET <- LHV * ET
