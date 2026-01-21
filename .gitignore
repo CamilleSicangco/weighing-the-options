@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+R/to_do.R
+R/analysis/debugging/
+debugging_out/
+data/out/old/
+data/austraits/
