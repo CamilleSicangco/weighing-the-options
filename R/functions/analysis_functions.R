@@ -1040,7 +1040,7 @@ LeafEnergyBalance_custom <- function(Tleaf = 21.5, Tair = 20,
   SLOPE <- (esat(Tair + 0.1) - esat(Tair)) / 0.1
   
   # Radiation conductance (mol m-2 s-1)
-  Gradiation <- 4.*Boltz*Tk(Tair)^3 * Emissivity / (CPAIR * AIRMA)
+  Gradiation <- 4.*Boltz*Tk(Tair)^3 * Emissivity / (CPAIR)
   
   # See Leuning et al (1995) PC&E 18:1183-1200 Appendix E
   # Boundary layer conductance for heat - single sided, forced convection

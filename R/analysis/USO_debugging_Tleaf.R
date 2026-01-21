@@ -21,15 +21,15 @@ Medlyn_preds$P = get_Pleaf_Medlyn_V(
   Ps = df$Ps, Tair = df$Tair, E = Medlyn_preds$ELEAF, 
   P50 = 4.07, P88 = 5.50, kmax_25 = 1.5, constant_kmax = FALSE)
 
-Medlyn_preds_sim_newLEB2 = Medlyn_preds %>%
+Medlyn_preds_sim_newLEB3 = Medlyn_preds %>%
   rename(E = ELEAF, Dleaf = VPDleaf, gs = GS, A = ALEAF) %>%
   mutate(Model = "Medlyn", .before = 1) %>%
   #mutate(P = NA) %>% 
   select(Model, Tair, E, Tleaf, Dleaf, gs, A, P, Ci
   )
 
-#save(Medlyn_preds_sim_oldLEB, Medlyn_preds_sim_newLEB, Medlyn_preds_sim_newLEB2,
-#     file = "data/out/USO_preds_LEB_test.Rdata")
+save(Medlyn_preds_sim_oldLEB, Medlyn_preds_sim_newLEB, Medlyn_preds_sim_newLEB2,
+     Medlyn_preds_sim_newLEB3, file = "data/out/USO_preds_LEB_test.Rdata")
 
 # Compare outputs ----------------------------------------------
 load("data/out/USO_preds_LEB_test.Rdata")
@@ -53,7 +53,9 @@ points(Medlyn_preds_sim_newLEB$Tleaf, Medlyn_preds_sim_newLEB$E, col = "red")
 
 # Add version with fixed units in P-M
 ## Fixed spread of E, but now magnitude is off?
+## 3rd version is fixed! Issue was an extra AIRMA multiplier
 points(Medlyn_preds_sim_newLEB$Tleaf, Medlyn_preds_sim_newLEB2$E, col = "blue")
+points(Medlyn_preds_sim_newLEB$Tleaf, Medlyn_preds_sim_newLEB3$E, col = "green")
 
 # Magnitude is off by a factor of around 3.75
 hist(Medlyn_preds_sim_oldLEB$E/Medlyn_preds_sim_newLEB2$E)
