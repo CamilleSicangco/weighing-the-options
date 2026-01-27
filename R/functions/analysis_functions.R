@@ -1106,3 +1106,36 @@ LeafEnergyBalance_custom <- function(Tleaf = 21.5, Tair = 20,
     return(l)
   }
 }
+
+C_gain_absval_corr = 
+  function (P, b = -2.5, c = 2, Amax = NULL, kmax_25 = 0.5, Tair = 25, 
+          VPD = 1.5, PPFD = 1000, Patm = 101.325, Wind = 5, Wleaf = 0.025, 
+          LeafAbs = 0.5, Ca = 400, Jmax = 100, Vcmax = 50, constant_kmax = FALSE, 
+          net = FALSE, Rd0 = 0.92, TrefR = 25, netOrig = TRUE, albedo = 0.15, 
+          epsilon = 0.97, gs_feedback = TRUE, StomatalRatio = 2, ...) 
+{
+  E = trans_from_vc(P, kmax_25, Tair, b, c, constant_kmax)
+  A = calc_A(Tair, VPD, PPFD, Patm, E, Wind, Wleaf, LeafAbs, 
+             Ca, Jmax, Vcmax, net, Rd0, TrefR, netOrig, albedo = albedo, 
+             epsilon = epsilon, gs_feedback = gs_feedback, StomatalRatio = StomatalRatio, 
+             ...)
+  E = ifelse(E == 0, NA, E)
+  A = ifelse(E == 0, NA, A)
+  Amax = if (is.null(Amax)) {
+    if (max(A[!is.na(A)]) < 0) {
+      max(abs(A[!is.na(A)]))
+    } else {
+      max(A[!is.na(A)])
+    }
+    }
+  else {
+    Amax
+  }
+  gain = if (!is.na(Amax) & Amax != 0) {
+    A/Amax
+  }
+  else {
+    rep(0, length = length(A))
+  }
+  return(gain)
+}
