@@ -45,7 +45,7 @@ load("data/out/control_runs.Rdata")
 heatwave <- subset(WTC4_data,HWtrt=="HW" & PPFD > 500 & E >= 0)
 
 # Fit GAMs
-gam_E.hw = gam(E ~ s(Tcan), data = heatwave)
+gam_E.hw = gam(E ~ s(Tcan, k = 6), data = heatwave)
 gam_A.hw = gam(A ~ s(Tcan), data = heatwave)
 
 # Get gs model predictions
@@ -142,7 +142,7 @@ plt_timeseries = function(df,
     } else if (yvar == "Tleaf") {
       expression("T"[leaf]*" (\u00B0C)")
     } else if (yvar == "A") {
-      expression("A (" * mu * "mol m"^-2*"s"^-1*")")
+      expression("A"[net]*" (" * mu * "mol m"^-2*"s"^-1*")")
     } else if (yvar == "Dleaf") {
       expression("VPD"[leaf]*" (kPa)")
     } else if (yvar == "E") {
