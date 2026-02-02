@@ -128,60 +128,6 @@ ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height 
 
 ## Figure 6: Time series of A, E -----------
 
-plt_timeseries = function(df,
-                          heatwave = TRUE,
-                          yvar = c("E", "A", "gs")) {
-  palette = c(Sperry = "#1E88E5", "Sperry + varkmax" = "#332288", "Sperry + CGnet" = "#e7d87d", "Sperry + CGnet + TC" = "orange", 
-              Medlyn = "#D81B60", observed = "grey50")
-  
-  ylabel = 
-    if (yvar == "gs") {
-      expression("g"[s]*" (mol m"^-2*"s"^-1*")")
-    } else if (yvar == "P") {
-      expression(psi[leaf]*" (-MPa)")
-    } else if (yvar == "Tleaf") {
-      expression("T"[leaf]*" (\u00B0C)")
-    } else if (yvar == "A") {
-      expression("A"[net]*" (" * mu * "mol m"^-2*"s"^-1*")")
-    } else if (yvar == "Dleaf") {
-      expression("VPD"[leaf]*" (kPa)")
-    } else if (yvar == "E") {
-      expression("E"*" (mmol m"^-2*"s"^-1*")")
-    }
-  
-  df = df %>% 
-    mutate(gs = ifelse(Model == "observed", gs, gs/2.9))
-  plt = df %>% 
-    ggplot() +
-    geom_point(aes(x = datetime, y = !!sym(yvar), color = Model), alpha = 0.3, size = 0.5) +
-    theme_classic() +
-    scale_color_manual(
-      values = palette,
-      labels = c("Observations",
-                 "USO",
-                 "ProfitMax",
-                 expression("ProfitMax"[k[max](T)]),
-                 expression("ProfitMax"[net]),
-                 expression("ProfitMax"[TC])
-      )) +
-    guides(color = guide_legend(override.aes = list(shape = 19, size = 2, alpha = 1)),
-           linetype = "none") +
-    ylab(ylabel) +
-    xlab("Date") 
-  
-  if(isTRUE(heatwave)) {
-    plt = plt +
-      annotate("rect",
-               xmin = as.POSIXct("2016-10-31", tz = "GMT"),
-               xmax = as.POSIXct("2016-11-04", tz = "GMT"),
-               ymin = -Inf,
-               ymax = Inf,
-               alpha = 0.2, fill = "red") 
-  }
-  
-  return(plt)
-}
-
 yvars = c("A", "E", "gs")
 timeseries.c = lapply(yvars, function(yvar) plt_timeseries(df =out.l$control, heatwave = FALSE, yvar))
 timeseries.hw = lapply(yvars, function(yvar) plt_timeseries(df =out.l$heatwave, heatwave = TRUE, yvar))
