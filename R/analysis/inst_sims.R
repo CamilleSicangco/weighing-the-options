@@ -34,8 +34,8 @@ cost_gain46 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92)
 
-Fig2 = composite_plot(cost_gain46)
-ggsave(filename = "figs/Fig2_40deg_inst_sim.tiff", Fig2, 
+Fig3 = composite_plot(cost_gain46)
+ggsave(filename = "figs/Fig3_46deg_inst_sim.tiff", Fig2, 
        width = 12.25, height = 6.5, bg = "white")
 
 # Tair = 48
@@ -48,8 +48,8 @@ cost_gain48 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Vcmax=100.52,EaV=62307,EdVC=2e5,delsC=639,
                             Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
-Fig3 = composite_plot(cost_gain48)
-ggsave(filename = "figs/Fig3_48deg_inst_sim.tiff", Fig3, 
+Fig2 = composite_plot(cost_gain48)
+ggsave(filename = "figs/Fig2_48deg_inst_sim.tiff", Fig3, 
        width = 12.25, height = 6.5, bg = "white")
 
 # Tair = 30
