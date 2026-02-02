@@ -30,6 +30,9 @@ preds.l = list(preds_varTcrit_constRH, preds_varTcrit_constVPD,
                         preds_varT50_constRH, preds_varT50_constVPD)
 names(preds.l) = c("varTcrit_constRH", "varTcrit_constVPD",
                    "varT50_constRH", "varT50_constVPD")
+
+save(preds.l, file = "data/out/sensitivity_analysis.Rdata")
+load("data/out/sensitivity_analysis.Rdata")
 # PLOTTING #####################################################################
 
 # Generate plots
@@ -61,7 +64,11 @@ plts.l = lapply(1:length(preds.l), function(i) {
 })
 names(plts.l) = names(preds.l)
 
-ggsave("figs/Fig4_SA_Tcrit_constRH.tiff", plts.l[[1]], height = 7, width = 11, bg = "white")
-ggsave("figs/SA_Tcrit_constVPD.tiff", plts.l[[2]], height = 7, width = 11, bg = "white")
-ggsave("figs/FigS6_SA_T50_constRH.tiff", plts.l[[3]], height = 7, width = 11, bg = "white")
-ggsave("figs/SA_T50_constVPD.tiff", plts.l[[4]], height = 7, width = 11, bg = "white")
+ggsave("figs/Fig4_SA_Tcrit_constRH.pdf", plts.l[[1]], 
+       height = 7, width = 11, bg = "white", dpi = 600)
+ggsave("figs/SA_Tcrit_constVPD.pdf", plts.l[[2]], 
+       height = 7, width = 11, bg = "white", dpi = 600)
+ggsave("figs/FigS6_SA_T50_constRH.pdf", plts.l[[3]], 
+       height = 7, width = 11, bg = "white", dpi = 600)
+ggsave("figs/SA_T50_constVPD.pdf", plts.l[[4]], 
+       height = 7, width = 11, bg = "white", dpi = 600)

@@ -100,7 +100,8 @@ FigS2 = ggplot(NULL, aes(x = date, y = Ps, color = chamber)) +
   xlab("Date") +
   ylab(expression("Predawn  "*psi[leaf]*" (MPa)")) +
   theme(text = element_text(size = 14))
-ggsave("figs/FigS2_Pleaf_timeseries.tiff", FigS2, height = 6, width = 10)
+ggsave("figs/FigS2_Pleaf_timeseries.pdf", FigS2, 
+       height = 6, width = 10, dpi = 600)
 
 # Combine with other WTC data
 WTC4_data$Ps = sapply(1:nrow(WTC4_data), function(i) {

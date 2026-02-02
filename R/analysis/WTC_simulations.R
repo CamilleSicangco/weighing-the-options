@@ -124,7 +124,8 @@ AEvT.plt = ggarrange(AvT.c + ylim(-2.5, 13) +
 AEvT.plt = 
   annotate_figure(AEvT.plt,
                   bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
-ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.tiff", width = 8, height = 7, bg = "white")
+ggsave(plot = AEvT.plt, filename = "figs/Fig5_AEvT_WTC.pdf", 
+       width = 8, height = 7, bg = "white", dpi = 600)
 
 ## Figure 6: Time series of A, E -----------
 
@@ -166,7 +167,8 @@ timeseries.plt = cowplot::plot_grid(aligned_plts2[[1]], aligned_plts2[[2]],
                                     rel_widths = c(1,0.2))
 timeseries.plt
 
-ggsave(plot = timeseries.plt, filename = "figs/Fig6_timeseries.tiff", width = 11, height = 7, bg = "white")
+ggsave(plot = timeseries.plt, filename = "figs/Fig6_timeseries.pdf", 
+       width = 11, height = 7, bg = "white", dpi = 600)
 
 ## Figure 7: Tleaf predictions vs observations -------------------------
 Tcrit = 46.5
@@ -203,7 +205,8 @@ df %>%
   annotate("text", x=10, y = T50 +2, label=expression("T"[50]), hjust = -0.5, colour = "orangered3", size = 8)+
   theme(plot.title = element_blank(),text = element_text(size = 20)) +  
   xlim(NA, 53)
-ggsave("figs/Fig7_Tleaf_vs_Tair.tiff", height = 7, width = 11, bg = "white")
+ggsave("figs/Fig7_Tleaf_vs_Tair.pdf", 
+       height = 7, width = 11, bg = "white", dpi = 600)
 
 ## Figure 8: Pleaf vs Tleaf ----------------------------------------------------
 
@@ -230,7 +233,8 @@ Fig8_PleafvT =
   annotate("text", x = 20, y = 5.50, label=expression("P"[88]), vjust = -0.5, colour = "orangered3", size = 5) +
   theme(text = element_text(size = 16)) +
   ylim(NA,5.7)
-ggsave("figs/Fig8_Pleaf_vs_T_WTC.tiff", Fig8_PleafvT, height = 7, width = 10, bg = "white")
+ggsave("figs/Fig8_Pleaf_vs_T_WTC.pdf", Fig8_PleafvT, 
+       height = 7, width = 10, bg = "white", dpi = 600)
 
 ## E vs Tleaf -----------
 out.l$heatwave %>% 
@@ -274,7 +278,8 @@ gs_vs_Tleaf.plt =
 gs_vs_Tleaf.plt = annotate_figure(gs_vs_Tleaf.plt,
                 bottom = text_grob(expression("T"[leaf]*" (\u00B0C)"), hjust = 1))
 
-ggsave(plot = gs_vs_Tleaf.plt, filename = "figs/FigS7_gs_vs_Tleaf.tiff", width = 11, height = 6, bg = "white")
+ggsave(plot = gs_vs_Tleaf.plt, filename = "figs/FigS7_gs_vs_Tleaf.pdf", 
+       width = 11, height = 6, bg = "white", dpi = 600)
 
 # Calculate TSM and HSM ########################################################
 

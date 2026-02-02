@@ -63,9 +63,11 @@ EDvsTleaf_constRH.plt = plot_composite_Trange(outputs_constRH, vars = "E, Dleaf"
 
 # Save plots
 ggsave(gsAPleafvsTleaf_constRH.plt,
-       filename = "figs/Fig1_TheoreticalSims_gsAPleafvsTleaf_constRH.tiff", width = 12.25, height = 10)
+       filename = "figs/Fig1_TheoreticalSims_gsAPleafvsTleaf_constRH.pdf", 
+       width = 12.25, height = 10, dpi = 600)
 ggsave(EDvsTleaf_constRH.plt,
-       filename = "figs/TheoreticalSims_EDvsTleaf_constRH.tiff", width = 12.25, height = 6.5)
+       filename = "figs/TheoreticalSims_EDvsTleaf_constRH.pdf", 
+       width = 12.25, height = 6.5, dpi = 600)
 
 # Plot Tleaf vs Tair
 Tleaf_plts.l = lapply(outputs_constRH, function(df) {
@@ -100,7 +102,8 @@ TleafvsTair.plt = plot_grid(legend,
                             nrow = 2, rel_heights = c(.1,1)) +
   theme(plot.margin = margin(t = 10, r = 10, b = 10, l = 10))
 ggsave(TleafvsTair.plt,
-       filename = "figs/TheoreticalSims_TleafvsTair.tiff", width = 12.25, height = 5.5)
+       filename = "figs/TheoreticalSims_TleafvsTair.pdf", 
+       width = 12.25, height = 5.5, dpi = 600)
 
 
 ## Constant VPD ----------------------
@@ -114,8 +117,8 @@ EDvsTleaf_constVPD.plt = plot_composite_Trange(outputs_constVPD, vars = "E, Dlea
 
 # Save plots
 ggsave(gsAPleafvsTleaf_constVPD.plt,
-       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.tiff", 
-       width = 12.25, height = 10, bg = "white")
+       filename = "figs/FigS3_TheoreticalSims_gsAPleafvsTleaf_constVPD.pdf", 
+       width = 12.25, height = 10, bg = "white", dpi = 600)
 ggsave(EDvsTleaf_constVPD.plt,
-       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.tiff", 
-       width = 12.25, height = 6.5, bg = "white")
+       filename = "figs/TheoreticalSims_EDvsTleaf_constVPD.pdf", 
+       width = 12.25, height = 6.5, bg = "white", dpi = 600)

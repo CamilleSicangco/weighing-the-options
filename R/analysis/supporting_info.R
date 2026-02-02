@@ -24,7 +24,8 @@ FigS1 = data.frame(Tair = rep(Tair_vec, 2),
                           expression(italic("J")["peakedArr"])
                         )) +
   guides(linetype = guide_legend(title = expression("J"[max])))
-ggsave("figs/FigS1_JvsT.tiff", FigS1, height = 6, width = 10, bg = "white")
+ggsave("figs/FigS1_JvsT.pdf", FigS1, 
+       height = 6, width = 10, bg = "white", dpi = 600)
 
 # Fig S2: Predawn time series ##################################################
 
@@ -78,27 +79,9 @@ FigS5 = data.frame(P, Ci = Ci_pred) %>%
   ylab(expression("C"[i]*" (ppm)")) +
   theme(text = element_text(size = 14)) +
   geom_hline(yintercept = 420, linetype = "dashed")
-ggsave("figs/FigS5_Ci_vs_Pleaf.tiff", FigS5, width = 9, height = 6, bg = "white")
+ggsave("figs/FigS5_Ci_vs_Pleaf.pdf", FigS5, 
+       width = 9, height = 6, bg = "white", dpi = 600)
 
 # Fig S6: T50 sensitivity analysis #############################################
 
 # See R/analysis/Tthreshold_sensitivity.R
-# Environment
-Tair_vec = seq(20,60, by = 5)
-PPFD = 1500
-VPD = RHtoVPD(RH = 60, TdegC = Tair_vec)
-
-# Ps = -0.5 MPa
-Tair_sim.df = data.frame(Tair = Tair_vec, PPFD = PPFD, VPD = VPD, Ps = 0.5)
-#out_Ps0.5_constRH = make_pred_compEB(Tair_sim.df, g1 = g1_alt)
-out = bind_rows(lapply(1:nrow(Tair_sim.df), 
-                       function(i) make_pred_compEB(
-                         Tair = Tair_sim.df$Tair[i], Ps = Tair_sim.df$Ps[i], 
-                         VPD = Tair_sim.df$VPD[i], PPFD = Tair_sim.df$PPFD[i],
-                         )))
-out$gs_feedback = rep(c("TRUE", "FALSE"), times = length(Tair_vec))
-out %>% 
-  #filter(gs_feedback == FALSE) %>% 
-  ggplot(aes(x = Tair, y = E, color = gs_feedback)) +
-  geom_point() +
-  theme_classic()
