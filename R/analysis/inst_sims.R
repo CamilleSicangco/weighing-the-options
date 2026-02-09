@@ -49,7 +49,7 @@ cost_gain48 = calc_costgain(P, b, c, kmax_25 = kmax_25,
                             Jmax = 165.53,EaJ=33115,EdVJ=2e5,delsJ=635, Rd0 = 0.92
 )
 Fig2 = composite_plot(cost_gain48)
-ggsave(filename = "figs/Fig2_48deg_inst_sim.pdf", Fig3, 
+ggsave(filename = "figs/Fig2_48deg_inst_sim.pdf", Fig2, 
        width = 12.25, height = 6.5, bg = "white", dpi = 600)
 
 # Tair = 30
