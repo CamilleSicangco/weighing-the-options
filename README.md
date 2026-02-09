@@ -2,7 +2,7 @@
 Camille K. Sicangco, Manon E. B. Sabot, John E. Drake, Mark G. Tjoelker, & Belinda E. Medlyn
 
 ## Overview
-Repository containing the code to reproduce the results in Sicangco et al., "Weighing the options: a test of alternative stomatal optimisation models at high temperatures". Submitted to New Phytologist.
+Repository containing the code to reproduce the results in Sicangco et al., "Weighing the options: a test of alternative stomatal optimisation models at high temperatures". Accepted in New Phytologist.
 
 ## Instructions
 To use this code, you will need to install `gsthermal`, a custom R package built for this analysis. You can find the package here: https://github.com/CamilleSicangco/gsthermal.
